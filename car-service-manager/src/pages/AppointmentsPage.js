@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from '../components/Header/Header';
 import Calendar from '../components/Calendar/Calendar';
 import AppointmentModal from '../components/AppointmentModal/AppointmentModal';
+import { firestore } from '../firebase'; // Import Firestore
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where } from 'firebase/firestore';
+import DatePicker from '../components/DatePicker/DatePicker';
 
 const timeSlots = [
   '09:00', '09:30',
@@ -16,25 +19,44 @@ const timeSlots = [
 ];
 
 function AppointmentsPage() {
-  const [appointments, setAppointments] = useState([
-    { id: 1, tech: 'Technician 1', startTime: '09:00', endTime: '10:00', description: 'Full Service', details: { vehicleReg: 'ABC123', vehicleMake: 'Toyota', customerName: 'John Doe', customerPhone: '123-456-7890', comment: 'Check brakes as well', expectedTime: 2 } },
-    // ...other appointments
-  ]);
+  const [appointments, setAppointments] = useState([]);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date()); // State to manage the selected date
+
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      const q = query(collection(firestore, 'appointments'), where('date', '==', selectedDate.toDateString()));
+      const querySnapshot = await getDocs(q);
+      const fetchedAppointments = [];
+      querySnapshot.forEach(doc => {
+        fetchedAppointments.push({ id: doc.id, ...doc.data() });
+      });
+      setAppointments(fetchedAppointments);
+    };
+    fetchAppointments();
+  }, [selectedDate]);
 
   const handleTimeSlotClick = (time, tech) => {
     const appointment = appointments.find(app => app.startTime === time && app.tech === tech);
     if (appointment) {
       setSelectedAppointment(appointment);
     } else {
-      setSelectedAppointment({ startTime: time, tech, endTime: getEndTime(time, 1), details: { expectedTime: 1 } });
+      setSelectedAppointment({ startTime: time, tech, endTime: getEndTime(time), date: selectedDate.toDateString() });
     }
     setIsModalOpen(true);
   };
 
-  const handleSaveAppointment = (newAppointment) => {
-    newAppointment.endTime = getEndTime(newAppointment.startTime, newAppointment.details.expectedTime);
+  const handleSaveAppointment = async (newAppointment) => {
+    if (newAppointment.id) {
+      // Update existing appointment
+      const appointmentRef = doc(firestore, 'appointments', newAppointment.id);
+      await updateDoc(appointmentRef, newAppointment);
+    } else {
+      // Add new appointment
+      const docRef = await addDoc(collection(firestore, 'appointments'), newAppointment);
+      newAppointment.id = docRef.id; // Set the ID of the new appointment
+    }
     setAppointments((prev) => {
       const existingAppointmentIndex = prev.findIndex(app => app.id === newAppointment.id);
       if (existingAppointmentIndex !== -1) {
@@ -42,26 +64,31 @@ function AppointmentsPage() {
         updatedAppointments[existingAppointmentIndex] = newAppointment;
         return updatedAppointments;
       }
-      return [...prev, { ...newAppointment, id: prev.length + 1 }];
+      return [...prev, newAppointment];
     });
     setIsModalOpen(false);
   };
 
-  const getEndTime = (startTime, duration) => {
-    const startIndex = timeSlots.indexOf(startTime);
-    const endIndex = startIndex + duration;
-    return timeSlots[endIndex] || timeSlots[timeSlots.length - 1];
-  };
-
-  const handleDeleteAppointment = (id) => {
+  const handleDeleteAppointment = async (id) => {
+    await deleteDoc(doc(firestore, 'appointments', id));
     setAppointments((prev) => prev.filter(app => app.id !== id));
     setIsModalOpen(false);
+  };
+
+  const getEndTime = (startTime) => {
+    const index = timeSlots.indexOf(startTime);
+    return timeSlots[index + 2] || timeSlots[timeSlots.length - 1];
+  };
+
+  const handleDateChange = (date) => {
+    setSelectedDate(date);
   };
 
   return (
     <div>
       <Header />
       <h1>Appointments Page</h1>
+      <DatePicker selectedDate={selectedDate} onDateChange={handleDateChange} />
       <Calendar
         appointments={appointments}
         onTimeSlotClick={handleTimeSlotClick}

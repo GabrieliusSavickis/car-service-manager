@@ -68,11 +68,11 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose }) {
           </label>
           <label>
             Vehicle Make:
-            <input type="text" name="vehicleMake" value={formData.vehicleMake} onChange={handleChange} required />
+            <input type="text" name="vehicleMake" value={formData.vehicleMake} onChange={handleChange} />
           </label>
           <label>
             Customer Name:
-            <input type="text" name="customerName" value={formData.customerName} onChange={handleChange} required />
+            <input type="text" name="customerName" value={formData.customerName} onChange={handleChange} />
           </label>
           <label>
             Customer Phone:
@@ -90,7 +90,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose }) {
           </label>
           <label>
             Comment:
-            <textarea name="comment" value={formData.comment} onChange={handleChange}></textarea>
+            <textarea name="comment" value={formData.comment} onChange={handleChange} required></textarea>
           </label>
           <button type="submit">Save Appointment</button>
           {appointment.id && <button type="button" className="delete-button" onClick={handleDelete}>Delete Appointment</button>}
