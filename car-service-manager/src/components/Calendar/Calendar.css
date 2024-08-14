@@ -1,7 +1,6 @@
 .calendar-container {
   display: grid;
   grid-template-columns: 100px repeat(4, 1fr); /* Adjust column sizes */
-  gap: 1px;
   background-color: #ddd;
 }
 
@@ -38,6 +37,13 @@
   background-color: #fff;
   border: 1px solid #ddd;
   position: relative;
+  overflow: visible;
+ 
+}
+
+.time-slot.lunch-time-slot {
+  background-color: #ccc; /* Gray out lunch time slots */
+  pointer-events: none; /* Disable clicking */
 }
 
 .appointment {
@@ -55,4 +61,6 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  z-index: 1;
+  box-sizing: border-box;
 }

@@ -17,7 +17,7 @@ const timeSlots = [
 
 function AppointmentsPage() {
   const [appointments, setAppointments] = useState([
-    { id: 1, tech: 'Technician 1', startTime: '09:00', endTime: '10:00', description: 'Full Service', details: { vehicleReg: 'ABC123', vehicleMake: 'Toyota', customerName: 'John Doe', customerPhone: '123-456-7890', comment: 'Check brakes as well' } },
+    { id: 1, tech: 'Technician 1', startTime: '09:00', endTime: '10:00', description: 'Full Service', details: { vehicleReg: 'ABC123', vehicleMake: 'Toyota', customerName: 'John Doe', customerPhone: '123-456-7890', comment: 'Check brakes as well', expectedTime: 2 } },
     // ...other appointments
   ]);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
@@ -28,12 +28,13 @@ function AppointmentsPage() {
     if (appointment) {
       setSelectedAppointment(appointment);
     } else {
-      setSelectedAppointment({ startTime: time, tech, endTime: getEndTime(time) });
+      setSelectedAppointment({ startTime: time, tech, endTime: getEndTime(time, 1), details: { expectedTime: 1 } });
     }
     setIsModalOpen(true);
   };
 
   const handleSaveAppointment = (newAppointment) => {
+    newAppointment.endTime = getEndTime(newAppointment.startTime, newAppointment.details.expectedTime);
     setAppointments((prev) => {
       const existingAppointmentIndex = prev.findIndex(app => app.id === newAppointment.id);
       if (existingAppointmentIndex !== -1) {
@@ -46,9 +47,10 @@ function AppointmentsPage() {
     setIsModalOpen(false);
   };
 
-  const getEndTime = (startTime) => {
-    const index = timeSlots.indexOf(startTime);
-    return timeSlots[index + 2] || timeSlots[timeSlots.length - 1];
+  const getEndTime = (startTime, duration) => {
+    const startIndex = timeSlots.indexOf(startTime);
+    const endIndex = startIndex + duration;
+    return timeSlots[endIndex] || timeSlots[timeSlots.length - 1];
   };
 
   return (
