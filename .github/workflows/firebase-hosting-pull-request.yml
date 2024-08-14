@@ -13,9 +13,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: npm run build
+
+      # Set the working directory to the nested car-service-manager folder
+      - name: Install dependencies
+        run: npm install
+        working-directory: ./car-service-manager  # Point to the correct subdirectory
+
+      - name: Build the app
+        run: npm run build
+        working-directory: ./car-service-manager  # Point to the correct subdirectory
+
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CARSERVICEMANAGER_54F05 }}
           projectId: carservicemanager-54f05
+          working-directory: ./car-service-manager  # Point to the correct subdirectory
