@@ -53,6 +53,11 @@ function AppointmentsPage() {
     return timeSlots[endIndex] || timeSlots[timeSlots.length - 1];
   };
 
+  const handleDeleteAppointment = (id) => {
+    setAppointments((prev) => prev.filter(app => app.id !== id));
+    setIsModalOpen(false);
+  };
+
   return (
     <div>
       <Header />
@@ -65,6 +70,7 @@ function AppointmentsPage() {
         <AppointmentModal
           appointment={selectedAppointment}
           onSave={handleSaveAppointment}
+          onDelete={handleDeleteAppointment}
           onClose={() => setIsModalOpen(false)}
         />
       )}

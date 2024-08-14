@@ -20,7 +20,7 @@ const timeOptions = [
   { label: '8 hours', value: 16 },
 ];
 
-function AppointmentModal({ appointment, onSave, onClose }) {
+function AppointmentModal({ appointment, onSave, onDelete, onClose }) {
   const [formData, setFormData] = useState({
     vehicleReg: '',
     vehicleMake: '',
@@ -48,6 +48,12 @@ function AppointmentModal({ appointment, onSave, onClose }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     onSave({ ...appointment, details: formData });
+  };
+
+  const handleDelete = () => {
+    if (appointment.id && window.confirm('Are you sure you want to delete this appointment?')) {
+      onDelete(appointment.id);
+    }
   };
 
   return (
@@ -87,6 +93,7 @@ function AppointmentModal({ appointment, onSave, onClose }) {
             <textarea name="comment" value={formData.comment} onChange={handleChange}></textarea>
           </label>
           <button type="submit">Save Appointment</button>
+          {appointment.id && <button type="button" className="delete-button" onClick={handleDelete}>Delete Appointment</button>}
         </form>
       </div>
     </div>
