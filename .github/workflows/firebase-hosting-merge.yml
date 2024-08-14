@@ -27,4 +27,4 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CARSERVICEMANAGER_54F05 }}
           channelId: live
           projectId: carservicemanager-54f05
-          working-directory: ./car-service-manager  # Point to the correct subdirectory
+          entryPoint: ./car-service-manager  # Use entryPoint to specify the correct subdirectory
