@@ -11,9 +11,17 @@ const AccountsPage = () => {
   const [filteredAccounts, setFilteredAccounts] = useState([]);
   const [selectedAccount, setSelectedAccount] = useState(null); // Track selected account
   const [serviceHistory, setServiceHistory] = useState([]);
-  const [expandedDescription, setExpandedDescription] = useState({});
   const navigate = useNavigate();
-  const [userRole, setUserRole] = useState('');
+
+  // Fetch the user role from sessionStorage
+  useEffect(() => {
+    const role = sessionStorage.getItem('userRole');
+    
+    // If the role is not available or the user is a technician, redirect to appointments
+    if (!role || role === 'technician') {
+      navigate('/appointments');
+    }
+  }, [navigate]);
 
   useEffect(() => {
     const fetchAccounts = async () => {
@@ -23,23 +31,8 @@ const AccountsPage = () => {
       setAccounts(accountsList);
     };
 
-    // Fetch the user role from sessionStorage
-    const role = sessionStorage.getItem('userRole');
-    
-    if (!role) {
-      // Handle case where role is not available
-      navigate('/login');
-    }
-
-    setUserRole(role);
-
-    // Redirect technicians away from the Accounts page
-    if (role === 'technician') {
-      navigate('/appointments');
-    }
-
     fetchAccounts();
-  }, [navigate]);
+  }, []);
 
   const handleSearchChange = (e) => {
     const value = e.target.value.toUpperCase();
@@ -132,11 +125,9 @@ const AccountsPage = () => {
                       <strong>Date:</strong> {appointment.startTime} <br />
                       <strong>Description:</strong> 
                       <span className="description-preview">
-                        {expandedDescription[appointment.id]
-                          ? appointment.details.tasks && appointment.details.tasks.length > 0
-                            ? appointment.details.tasks.map(task => task.text).join(', ')
-                            : 'No tasks available'
-                          : 'No description available'}
+                        {appointment.details.tasks && appointment.details.tasks.length > 0
+                          ? appointment.details.tasks.map(task => task.text).join(', ')
+                          : 'No tasks available'}
                       </span>
                       <br />
                       <strong>Technician:</strong> {appointment.tech}
