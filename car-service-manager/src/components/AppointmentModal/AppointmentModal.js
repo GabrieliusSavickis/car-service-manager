@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './AppointmentModal.css';
+import { FaCircle, FaCheckCircle } from 'react-icons/fa'; // Use icons for checkbox
 
 const timeOptions = [
   { label: '30 minutes', value: 1 },
@@ -26,11 +27,20 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose }) {
     vehicleMake: '',
     customerName: '',
     customerPhone: '',
-    comment: '',
-    expectedTime: 1,  // Default to 30 minutes
+    expectedTime: 1,
+    tasks: [],  // To-do list tasks
   });
 
+  const [newTask, setNewTask] = useState('');
+  const [userRole, setUserRole] = useState('');
+  const [username, setUsername] = useState('');
+
   useEffect(() => {
+    const role = sessionStorage.getItem('userRole');
+    const storedUsername = sessionStorage.getItem('username');
+    setUserRole(role);
+    setUsername(storedUsername);
+
     if (appointment.details) {
       setFormData(appointment.details);
     }
@@ -45,14 +55,45 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose }) {
     setFormData((prev) => ({ ...prev, expectedTime: parseInt(e.target.value) }));
   };
 
+  const handleAddTask = () => {
+    if (newTask.trim() === '') return;
+
+    setFormData((prev) => ({
+      ...prev,
+      tasks: [...prev.tasks, { text: newTask, completed: false, completedBy: null }]
+    }));
+    setNewTask('');
+  };
+
+  const handleToggleTaskCompletion = (index) => {
+    setFormData((prev) => {
+      const updatedTasks = [...prev.tasks];
+      updatedTasks[index].completed = !updatedTasks[index].completed;
+      updatedTasks[index].completedBy = updatedTasks[index].completed ? username : null;
+      return { ...prev, tasks: updatedTasks };
+    });
+  };
+
+  const handleDeleteTask = (index) => {
+    setFormData((prev) => {
+      const updatedTasks = [...prev.tasks];
+      updatedTasks.splice(index, 1);
+      return { ...prev, tasks: updatedTasks };
+    });
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSave({ ...appointment, details: formData });
+    if (onSave) {
+      onSave({ ...appointment, details: formData });
+    }
   };
 
   const handleDelete = () => {
     if (appointment.id && window.confirm('Are you sure you want to delete this appointment?')) {
-      onDelete(appointment.id);
+      if (onDelete) {
+        onDelete(appointment.id);
+      }
     }
   };
 
@@ -88,12 +129,46 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose }) {
               ))}
             </select>
           </label>
-          <label>
-            Comment:
-            <textarea name="comment" value={formData.comment} onChange={handleChange} required></textarea>
-          </label>
-          <button type="submit">Save Appointment</button>
-          {appointment.id && <button type="button" className="delete-button" onClick={handleDelete}>Delete Appointment</button>}
+
+          {/* To-do List Section */}
+          <div className="todo-list-section">
+            <label>To-Do List:</label>
+            <ul className="todo-list">
+              {formData.tasks.map((task, index) => (
+                <li key={index} className={`task-item ${task.completed ? 'completed' : ''}`}>
+                  <span className="task-circle" onClick={() => handleToggleTaskCompletion(index)}>
+                    {task.completed ? <FaCheckCircle /> : <FaCircle />}
+                  </span>
+                  <span className="task-text">{task.text}</span>
+                  {task.completed && (
+                    <span className="completed-by"> (Completed by: {task.completedBy})</span>
+                  )}
+                  <button type="button" onClick={() => handleDeleteTask(index)}>Delete</button>
+                </li>
+              ))}
+            </ul>
+            <div className="new-task-input">
+              <input
+                type="text"
+                value={newTask}
+                onChange={(e) => setNewTask(e.target.value)}
+                placeholder="Add a new task"
+              />
+              <button type="button" onClick={handleAddTask}>Add Task</button>
+            </div>
+          </div>
+
+          <button type="submit" disabled={userRole !== 'admin'}>Save Appointment</button>
+          {appointment.id && (
+            <button
+              type="button"
+              className="delete-button"
+              onClick={handleDelete}
+              disabled={userRole !== 'admin'}  // Disable for non-admins
+            >
+              Delete Appointment
+            </button>
+          )}
         </form>
       </div>
     </div>

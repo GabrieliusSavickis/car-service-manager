@@ -3,6 +3,7 @@ import { firestore } from '../firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import Header from '../components/Header/Header';
 import './AccountsPage.css';
+import { useNavigate } from 'react-router-dom';
 
 const AccountsPage = () => {
   const [accounts, setAccounts] = useState([]);
@@ -11,6 +12,8 @@ const AccountsPage = () => {
   const [selectedAccount, setSelectedAccount] = useState(null); // Track selected account
   const [serviceHistory, setServiceHistory] = useState([]);
   const [expandedDescription, setExpandedDescription] = useState({});
+  const navigate = useNavigate();
+  const [userRole, setUserRole] = useState('');
 
   useEffect(() => {
     const fetchAccounts = async () => {
@@ -20,8 +23,23 @@ const AccountsPage = () => {
       setAccounts(accountsList);
     };
 
+    // Fetch the user role from sessionStorage
+    const role = sessionStorage.getItem('userRole');
+    
+    if (!role) {
+      // Handle case where role is not available
+      navigate('/login');
+    }
+
+    setUserRole(role);
+
+    // Redirect technicians away from the Accounts page
+    if (role === 'technician') {
+      navigate('/appointments');
+    }
+
     fetchAccounts();
-  }, []);
+  }, [navigate]);
 
   const handleSearchChange = (e) => {
     const value = e.target.value.toUpperCase();
@@ -122,17 +140,11 @@ const AccountsPage = () => {
                       <strong>Description:</strong> 
                       <span className="description-preview">
                         {expandedDescription[appointment.id]
-                          ? appointment.details.comment
-                          : `${appointment.details.comment.slice(0, 100)}... `}
+                          ? appointment.details.tasks && appointment.details.tasks.length > 0
+                            ? appointment.details.tasks.map(task => task.text).join(', ')
+                            : 'No tasks available'
+                          : 'No description available'}
                       </span>
-                      {appointment.details.comment.length > 100 && (
-                        <span
-                          className="read-more"
-                          onClick={() => toggleDescription(appointment.id)}
-                        >
-                          {expandedDescription[appointment.id] ? 'Read less' : 'Read more'}
-                        </span>
-                      )}
                       <br />
                       <strong>Technician:</strong> {appointment.tech}
                     </li>

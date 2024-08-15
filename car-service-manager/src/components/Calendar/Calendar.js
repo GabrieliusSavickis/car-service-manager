@@ -61,7 +61,12 @@ const Calendar = ({ appointments, onTimeSlotClick }) => {
                       }}
                     >
                       <div>{appointment.details.vehicleReg}</div>
-                      <div>{appointment.details.comment.slice(0, 20)}...</div>
+                      {/* Safely handle task display instead of comment */}
+                      <div>
+                        {appointment.details.tasks && appointment.details.tasks.length > 0 
+                          ? appointment.details.tasks[0].text.slice(0, 20) + '...' 
+                          : 'No tasks available'}
+                      </div>
                     </div>
                   )}
                 </div>
