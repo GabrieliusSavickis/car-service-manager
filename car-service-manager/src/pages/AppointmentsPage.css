@@ -1,0 +1,22 @@
+.top-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Space between the DatePicker and the Today button */
+    margin-bottom: 20px;
+    justify-content: center; /* Center the controls on the page */
+  }
+  
+  .today-button {
+    padding: 4px 14px;
+    background-color: #c23b22;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .today-button:hover {
+    background-color: #a32e1c;
+  }
+  
