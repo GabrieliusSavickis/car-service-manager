@@ -66,13 +66,6 @@ const AccountsPage = () => {
     setServiceHistory(appointmentsList); // Set the service history
   };
 
-  const toggleDescription = (id) => {
-    setExpandedDescription((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
-  };
-
   return (
     <div className="accounts-page">
       <Header />
