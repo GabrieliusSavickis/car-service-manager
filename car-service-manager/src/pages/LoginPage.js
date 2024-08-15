@@ -1,11 +1,12 @@
-// src/pages/LoginPage.js
 import React, { useState } from 'react';
 import { auth, signInWithEmailAndPasswordFunction } from '../firebase';
 import { useNavigate } from 'react-router-dom';
+import { firestore } from '../firebase';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import './LoginPage.css';
 
 function LoginPage() {
-  const [email, setEmail] = useState('');
+  const [loginInput, setLoginInput] = useState(''); // This will hold either username or email
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -13,12 +14,48 @@ function LoginPage() {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
+      let email = loginInput;
+
+      // Check if the input is a username and fetch the associated email
+      if (!loginInput.includes('@')) {
+        const q = query(collection(firestore, 'users'), where('username', '==', loginInput));
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+          // Get the email associated with the username
+          const userData = querySnapshot.docs[0].data();
+          email = userData.email;
+        } else {
+          throw new Error('Username not found.');
+        }
+      }
+
+      // Use the email for login
       await signInWithEmailAndPasswordFunction(auth, email, password);
+
+      // Fetch the role after login
+      const role = await fetchUserRole(email);
+
+      // You can store the role in session storage or context/state management for future use
+      sessionStorage.setItem('userRole', role); // Store the user's role
+
       setError('');
       navigate('/appointments');
     } catch (error) {
       setError(error.message);
     }
+  };
+
+  const fetchUserRole = async (email) => {
+    const q = query(collection(firestore, 'users'), where('email', '==', email));
+    const querySnapshot = await getDocs(q);
+
+    if (!querySnapshot.empty) {
+      const userData = querySnapshot.docs[0].data();
+      return userData.role; // Return the role of the user (e.g., 'admin', 'technician')
+    }
+
+    throw new Error('User role not found.');
   };
 
   return (
@@ -28,11 +65,11 @@ function LoginPage() {
         <h2>Log In</h2>
         <form onSubmit={handleLogin}>
           <div className="form-group">
-            <label>Username</label>
+            <label>Username or Email</label>
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              value={loginInput}
+              onChange={(e) => setLoginInput(e.target.value)}
               required
             />
           </div>

@@ -44,4 +44,16 @@
 .logout-icon:hover {
   color: #a32e1c;
 }
+
+.username-display {
+  color: #333;
+  font-size: 1rem;
+  margin-right: 15px;
+  align-self: center;
+}
+
+.username {
+  font-weight: bold; /* Only the username will be bold */
+}
+
   
