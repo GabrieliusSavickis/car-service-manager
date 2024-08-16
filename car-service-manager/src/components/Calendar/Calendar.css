@@ -64,3 +64,21 @@
   z-index: 1;
   box-sizing: border-box;
 }
+
+/* New styles for lunch break */
+.lunch-break-divider {
+  grid-column: 1 / span 5; /* Span across the entire grid */
+  background-color: #f0f0f0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 38px; /* Adjust height if needed */
+  font-weight: bold;
+  color: #555;
+}
+
+.lunch-break-label {
+  text-align: center;
+  font-size: 1.2rem;
+  color: #555;
+}
