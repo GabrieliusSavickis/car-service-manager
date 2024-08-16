@@ -136,6 +136,7 @@ function AppointmentsPage() {
       {isModalOpen && (
         <AppointmentModal
         appointment={selectedAppointment}
+        startTime={selectedAppointment?.startTime}  // Pass the startTime prop
         onSave={userRole === 'admin' ? handleSaveAppointment : null}
         onDelete={userRole === 'admin' ? handleDeleteAppointment : null}
         onClose={() => setIsModalOpen(false)}

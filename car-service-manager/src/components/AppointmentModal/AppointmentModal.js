@@ -21,7 +21,7 @@ const timeOptions = [
   { label: '8 hours', value: 16 },
 ];
 
-function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn }) {
+function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, startTime }) {
   const [formData, setFormData] = useState({
     vehicleReg: '',
     vehicleMake: '',
@@ -124,7 +124,13 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn })
     <div className="modal">
       <div className="modal-content">
         <span className="close" onClick={onClose}>&times;</span>
-        <h2>{appointment.id ? 'Edit Appointment' : 'New Appointment'}</h2>
+        
+        {/* Display the start time when creating a new appointment */}
+        {!appointment.id && <h2>New Appointment at {startTime}</h2>}
+        
+        {/* Display 'Edit Appointment' for existing appointments */}
+        {appointment.id && <h2>Edit Appointment</h2>}
+        
         <form onSubmit={handleSubmit}>
           <label>
             Vehicle Reg:
