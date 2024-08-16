@@ -14,7 +14,6 @@ const timeSlots = [
   '17:00', '17:30',
 ];
 
-const lunchBreakDividerIndex = 6; // Position of '13:30' in the timeSlots array
 
 const technicians = ['Technician 1', 'Technician 2', 'Technician 3', 'Technician 4'];
 
