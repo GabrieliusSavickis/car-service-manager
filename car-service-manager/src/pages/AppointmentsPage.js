@@ -3,7 +3,7 @@ import Header from '../components/Header/Header';
 import Calendar from '../components/Calendar/Calendar';
 import AppointmentModal from '../components/AppointmentModal/AppointmentModal';
 import { firestore } from '../firebase'; // Import Firestore
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, setDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, setDoc, onSnapshot } from 'firebase/firestore';
 import DatePicker from '../components/DatePicker/DatePicker';
 import './AppointmentsPage.css';
 
@@ -24,20 +24,30 @@ function AppointmentsPage() {
   const endOfWorkDay = '18:00'; // End of working hours
   const workdayStart = '09:00'; // Start of working hours
 
+  // Use Firestore real-time listeners with onSnapshot
   useEffect(() => {
     const role = sessionStorage.getItem('userRole');
     setUserRole(role);
 
-    const fetchAppointments = async () => {
+    // Set up Firestore real-time listener for appointments
+    const fetchAppointments = () => {
       const q = query(collection(firestore, 'appointments'), where('date', '==', selectedDate.toDateString()));
-      const querySnapshot = await getDocs(q);
-      const fetchedAppointments = [];
-      querySnapshot.forEach(doc => {
-        fetchedAppointments.push({ id: doc.id, ...doc.data() });
+
+      // Subscribe to real-time updates
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const fetchedAppointments = [];
+        querySnapshot.forEach(doc => {
+          fetchedAppointments.push({ id: doc.id, ...doc.data() });
+        });
+        setAppointments(fetchedAppointments);
       });
-      setAppointments(fetchedAppointments);
+
+      return () => unsubscribe(); // Clean up listener on component unmount
     };
-    fetchAppointments();
+
+    const unsubscribe = fetchAppointments();
+
+    return () => unsubscribe(); // Clean up the real-time listener when the date changes or component unmounts
   }, [selectedDate]);
 
   const handleTimeSlotClick = (time, tech) => {
@@ -52,18 +62,18 @@ function AppointmentsPage() {
 
   const handleSaveAppointment = async (newAppointment) => {
     if (userRole !== 'admin') return; // Restrict saving for non-admin users
-
+  
     const workdayEndIndex = timeSlots.indexOf(endOfWorkDay);
     const startTimeIndex = timeSlots.indexOf(newAppointment.startTime);
     const totalSlotsNeeded = newAppointment.details.expectedTime;
-
+  
     // Calculate available slots on the first day
-    const availableSlotsToday = workdayEndIndex - startTimeIndex; // Exclude the end slot
-
+    const availableSlotsToday = workdayEndIndex - startTimeIndex; // Only up to the end of the day
+  
     if (totalSlotsNeeded > availableSlotsToday) {
       // Appointment spans into the next day
       const remainingSlots = totalSlotsNeeded - availableSlotsToday;
-
+  
       // Create the first part of the appointment (today)
       const updatedAppointment = {
         ...newAppointment,
@@ -72,7 +82,7 @@ function AppointmentsPage() {
           expectedTime: availableSlotsToday, // Only fill the available slots today
         },
       };
-
+  
       // Save the first part
       if (updatedAppointment.id) {
         const appointmentRef = doc(firestore, 'appointments', updatedAppointment.id);
@@ -81,23 +91,26 @@ function AppointmentsPage() {
         const docRef = await addDoc(collection(firestore, 'appointments'), updatedAppointment);
         updatedAppointment.id = docRef.id;
       }
-
-      // Create the second part of the appointment (next day)
-      const nextDay = new Date(newAppointment.date);
-      nextDay.setDate(nextDay.getDate() + 1);
-
-      const nextDayAppointment = {
-        ...newAppointment,
-        date: nextDay.toDateString(),
-        startTime: workdayStart,
-        details: {
-          ...newAppointment.details,
-          expectedTime: remainingSlots, // Remaining time that spans into the next day
-        },
-      };
-
-      // Save the second part
-      await addDoc(collection(firestore, 'appointments'), nextDayAppointment);
+  
+      // Ensure no additional appointments are created if not needed
+      if (remainingSlots > 0) {
+        // Create the second part of the appointment (next day)
+        const nextDay = new Date(newAppointment.date);
+        nextDay.setDate(nextDay.getDate() + 1);
+  
+        const nextDayAppointment = {
+          ...newAppointment,
+          date: nextDay.toDateString(),
+          startTime: workdayStart,
+          details: {
+            ...newAppointment.details,
+            expectedTime: remainingSlots, // Remaining time that spans into the next day
+          },
+        };
+  
+        // Save the second part
+        await addDoc(collection(firestore, 'appointments'), nextDayAppointment);
+      }
     } else {
       // Save normally if it doesn't span into the next day
       if (newAppointment.id) {
@@ -108,7 +121,7 @@ function AppointmentsPage() {
         newAppointment.id = docRef.id; // Set the ID of the new appointment
       }
     }
-
+  
     // Update accounts
     const accountRef = doc(firestore, 'accounts', newAppointment.details.vehicleReg);
     const accountData = {
@@ -117,20 +130,12 @@ function AppointmentsPage() {
       customerPhone: newAppointment.details.customerPhone,
       vehicleMake: newAppointment.details.vehicleMake,
     };
-
+  
     await setDoc(accountRef, accountData, { merge: true });
-
-    setAppointments((prev) => {
-      const existingAppointmentIndex = prev.findIndex(app => app.id === newAppointment.id);
-      if (existingAppointmentIndex !== -1) {
-        const updatedAppointments = [...prev];
-        updatedAppointments[existingAppointmentIndex] = newAppointment;
-        return updatedAppointments;
-      }
-      return [...prev, newAppointment];
-    });
+  
     setIsModalOpen(false);
   };
+  
 
   const handleDeleteAppointment = async (id) => {
     if (userRole !== 'admin') return; // Restrict deletion for non-admin users
