@@ -101,6 +101,24 @@ function AppointmentsPage() {
     setSelectedDate(new Date()); // Set the date to today's date
   };
 
+  const handleCheckIn = (appointmentId) => {
+    setAppointments((prevAppointments) =>
+      prevAppointments.map((app) =>
+        app.id === appointmentId
+          ? {
+              ...app,
+              details: {
+                ...app.details,
+                inProgress: true,
+                newTasksAdded: false,  // Reset any previous flags
+              },
+            }
+          : app
+      )
+    );
+  };
+  
+
   return (
     <div>
       <Header />
@@ -117,11 +135,12 @@ function AppointmentsPage() {
       />
       {isModalOpen && (
         <AppointmentModal
-          appointment={selectedAppointment}
-          onSave={userRole === 'admin' ? handleSaveAppointment : null} // Disable save for technicians
-          onDelete={userRole === 'admin' ? handleDeleteAppointment : null} // Disable delete for technicians
-          onClose={() => setIsModalOpen(false)}
-        />
+        appointment={selectedAppointment}
+        onSave={userRole === 'admin' ? handleSaveAppointment : null}
+        onDelete={userRole === 'admin' ? handleDeleteAppointment : null}
+        onClose={() => setIsModalOpen(false)}
+        onCheckIn={handleCheckIn}  // Pass the check-in handler
+      />      
       )}
     </div>
   );

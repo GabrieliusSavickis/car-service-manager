@@ -21,12 +21,24 @@ const technicians = [
 
 const Calendar = ({ appointments, onTimeSlotClick }) => {
   const getAppointmentDurationInSlots = (appointment) => {
-    return appointment.details.expectedTime; // Expected time is in slots, which aligns with the time options in the modal
+    return appointment.details.expectedTime; // Expected time is in slots
   };
 
   const getAdjustedHeight = (duration) => {
     const totalBorderHeight = (duration - 1) * 1.75; // Border height (1px) times the number of internal borders
     return `calc(${duration * 100}% + ${totalBorderHeight}px)`;
+  };
+
+  const getAppointmentColor = (appointment) => {
+    if (appointment.details.newTasksAdded) {
+      return '#f44336'; // Red if new tasks were added after check-in
+    }
+    if (appointment.details.tasks.every(task => task.completed)) {
+      return '#28a745'; // Green if all tasks are complete
+    } else if (appointment.details.inProgress) {
+      return '#ff9800'; // Yellow if in progress
+    }
+    return '#2297c2'; // Default blue for not checked-in
   };
 
   return (
@@ -56,12 +68,12 @@ const Calendar = ({ appointments, onTimeSlotClick }) => {
                       key={appointment.id}
                       className="appointment"
                       style={{
+                        backgroundColor: getAppointmentColor(appointment),
                         height: getAdjustedHeight(getAppointmentDurationInSlots(appointment)),
                         gridRow: `span ${getAppointmentDurationInSlots(appointment)}`,
                       }}
                     >
                       <div>{appointment.details.vehicleReg}</div>
-                      {/* Safely handle task display instead of comment */}
                       <div>
                         {appointment.details.tasks && appointment.details.tasks.length > 0 
                           ? appointment.details.tasks[0].text.slice(0, 20) + '...' 

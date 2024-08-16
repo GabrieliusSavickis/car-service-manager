@@ -21,14 +21,16 @@ const timeOptions = [
   { label: '8 hours', value: 16 },
 ];
 
-function AppointmentModal({ appointment, onSave, onDelete, onClose }) {
+function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn }) {
   const [formData, setFormData] = useState({
     vehicleReg: '',
     vehicleMake: '',
     customerName: '',
     customerPhone: '',
     expectedTime: 1,
-    tasks: [],  // To-do list tasks
+    tasks: [],
+    inProgress: false,  // Track if the appointment is in progress
+    newTasksAdded: false, // Track if a new task was added after check-in
   });
 
   const [newTask, setNewTask] = useState('');
@@ -60,7 +62,8 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose }) {
 
     setFormData((prev) => ({
       ...prev,
-      tasks: [...prev.tasks, { text: newTask, completed: false, completedBy: null }]
+      tasks: [...prev.tasks, { text: newTask, completed: false, completedBy: null }],
+      newTasksAdded: formData.inProgress ? true : false, // Only set this if the appointment is in progress
     }));
     setNewTask('');
   };
@@ -72,6 +75,14 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose }) {
       updatedTasks[index].completedBy = updatedTasks[index].completed ? username : null;
       return { ...prev, tasks: updatedTasks };
     });
+  };
+
+  const handleCheckIn = () => {
+    setFormData((prev) => ({
+      ...prev,
+      inProgress: true,  // Mark appointment as in-progress
+    }));
+    onCheckIn(appointment.id);  // Callback to change color in Calendar
   };
 
   const handleDeleteTask = (index) => {
@@ -89,6 +100,14 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose }) {
     }
   };
 
+  const handleModalOpen = () => {
+    // Reset the newTasksAdded flag when the modal is opened (appointment reviewed)
+    setFormData((prev) => ({
+      ...prev,
+      newTasksAdded: false,
+    }));
+  };
+
   const handleDelete = () => {
     if (appointment.id && window.confirm('Are you sure you want to delete this appointment?')) {
       if (onDelete) {
@@ -96,6 +115,10 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose }) {
       }
     }
   };
+
+  useEffect(() => {
+    handleModalOpen(); // Reset color when the modal opens
+  }, []);
 
   return (
     <div className="modal">
@@ -157,6 +180,16 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose }) {
               <button type="button" onClick={handleAddTask}>Add Task</button>
             </div>
           </div>
+
+          {/* Check-In Button */}
+          <button 
+            type="button" 
+            className="checkin-button" 
+            onClick={handleCheckIn} 
+            disabled={formData.inProgress} 
+            style={{ display: formData.inProgress ? 'none' : 'inline-block' }}>
+            Check In
+          </button>
 
           <button type="submit" disabled={userRole !== 'admin'}>Save Appointment</button>
           {appointment.id && (
