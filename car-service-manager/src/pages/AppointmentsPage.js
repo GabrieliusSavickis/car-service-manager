@@ -14,6 +14,16 @@ function AppointmentsPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [userRole, setUserRole] = useState('');
 
+  // Define the time slots here
+  const timeSlots = [
+    '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
+    '12:00', '13:30', '14:00', '14:30', '15:00', '15:30',
+    '16:00', '16:30', '17:00', '17:30', '18:00',
+  ];
+
+  const endOfWorkDay = '18:00'; // End of working hours
+  const workdayStart = '09:00'; // Start of working hours
+
   useEffect(() => {
     const role = sessionStorage.getItem('userRole');
     setUserRole(role);
@@ -43,16 +53,63 @@ function AppointmentsPage() {
   const handleSaveAppointment = async (newAppointment) => {
     if (userRole !== 'admin') return; // Restrict saving for non-admin users
 
-    if (newAppointment.id) {
-      // Update existing appointment
-      const appointmentRef = doc(firestore, 'appointments', newAppointment.id);
-      await updateDoc(appointmentRef, newAppointment);
+    const workdayEndIndex = timeSlots.indexOf(endOfWorkDay);
+    const startTimeIndex = timeSlots.indexOf(newAppointment.startTime);
+    const totalSlotsNeeded = newAppointment.details.expectedTime;
+
+    // Calculate available slots on the first day
+    const availableSlotsToday = workdayEndIndex - startTimeIndex; // Exclude the end slot
+
+    if (totalSlotsNeeded > availableSlotsToday) {
+      // Appointment spans into the next day
+      const remainingSlots = totalSlotsNeeded - availableSlotsToday;
+
+      // Create the first part of the appointment (today)
+      const updatedAppointment = {
+        ...newAppointment,
+        details: {
+          ...newAppointment.details,
+          expectedTime: availableSlotsToday, // Only fill the available slots today
+        },
+      };
+
+      // Save the first part
+      if (updatedAppointment.id) {
+        const appointmentRef = doc(firestore, 'appointments', updatedAppointment.id);
+        await updateDoc(appointmentRef, updatedAppointment);
+      } else {
+        const docRef = await addDoc(collection(firestore, 'appointments'), updatedAppointment);
+        updatedAppointment.id = docRef.id;
+      }
+
+      // Create the second part of the appointment (next day)
+      const nextDay = new Date(newAppointment.date);
+      nextDay.setDate(nextDay.getDate() + 1);
+
+      const nextDayAppointment = {
+        ...newAppointment,
+        date: nextDay.toDateString(),
+        startTime: workdayStart,
+        details: {
+          ...newAppointment.details,
+          expectedTime: remainingSlots, // Remaining time that spans into the next day
+        },
+      };
+
+      // Save the second part
+      await addDoc(collection(firestore, 'appointments'), nextDayAppointment);
     } else {
-      // Add new appointment
-      const docRef = await addDoc(collection(firestore, 'appointments'), newAppointment);
-      newAppointment.id = docRef.id; // Set the ID of the new appointment
+      // Save normally if it doesn't span into the next day
+      if (newAppointment.id) {
+        const appointmentRef = doc(firestore, 'appointments', newAppointment.id);
+        await updateDoc(appointmentRef, newAppointment);
+      } else {
+        const docRef = await addDoc(collection(firestore, 'appointments'), newAppointment);
+        newAppointment.id = docRef.id; // Set the ID of the new appointment
+      }
     }
 
+    // Update accounts
     const accountRef = doc(firestore, 'accounts', newAppointment.details.vehicleReg);
     const accountData = {
       vehicleReg: newAppointment.details.vehicleReg,
@@ -84,11 +141,6 @@ function AppointmentsPage() {
   };
 
   const getEndTime = (startTime) => {
-    const timeSlots = [
-      '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-      '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
-      '15:00', '15:30', '16:00', '16:30', '17:00', '17:30'
-    ];
     const index = timeSlots.indexOf(startTime);
     return timeSlots[index + 2] || timeSlots[timeSlots.length - 1];
   };
@@ -117,7 +169,6 @@ function AppointmentsPage() {
       )
     );
   };
-  
 
   return (
     <div>
@@ -135,13 +186,13 @@ function AppointmentsPage() {
       />
       {isModalOpen && (
         <AppointmentModal
-        appointment={selectedAppointment}
-        startTime={selectedAppointment?.startTime}  // Pass the startTime prop
-        onSave={userRole === 'admin' ? handleSaveAppointment : null}
-        onDelete={userRole === 'admin' ? handleDeleteAppointment : null}
-        onClose={() => setIsModalOpen(false)}
-        onCheckIn={handleCheckIn}  // Pass the check-in handler
-      />      
+          appointment={selectedAppointment}
+          startTime={selectedAppointment?.startTime}  // Pass the startTime prop
+          onSave={userRole === 'admin' ? handleSaveAppointment : null}
+          onDelete={userRole === 'admin' ? handleDeleteAppointment : null}
+          onClose={() => setIsModalOpen(false)}
+          onCheckIn={handleCheckIn}  // Pass the check-in handler
+        />
       )}
     </div>
   );
