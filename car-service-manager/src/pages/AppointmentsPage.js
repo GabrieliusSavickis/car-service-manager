@@ -202,52 +202,79 @@ function AppointmentsPage() {
     const totalSlotsNeeded = details.expectedTime;
 
     let remainingSlots = totalSlotsNeeded;
-    let currentDate = appointmentDate;
+    let currentDate = new Date(appointmentDate); // Use a copy of the date
+    let iterationCount = 0; // Safeguard to prevent infinite loop
 
-    // Check each day the appointment spans
-    while (remainingSlots > 0) {
+    // Helper function to check overlap for a specific day
+    const checkDayOverlap = (currentDate, startIndex, remainingSlots) => {
       const isSameDay = currentDate.toDateString() === appointmentDate.toDateString();
       const appointmentsOnCurrentDay = appointments.filter(app => {
         return app.tech === tech && new Date(app.date).toDateString() === currentDate.toDateString();
       });
-
+    
       if (isSameDay) {
         // Calculate the available slots on the current day
         const availableSlotsToday = timeSlots.length - startIndex;
         const endIndex = startIndex + Math.min(availableSlotsToday, remainingSlots);
-
+    
         // Check for overlap on the same day
         for (let app of appointmentsOnCurrentDay) {
           const existingStartIndex = timeSlots.indexOf(app.startTime);
           const existingEndIndex = existingStartIndex + app.details.expectedTime;
-
+    
           if (startIndex < existingEndIndex && endIndex > existingStartIndex) {
             return true; // Overlap detected
           }
         }
-
-        // Subtract the slots used today from the remaining slots
-        remainingSlots -= availableSlotsToday;
+    
+        // No overlap detected on the same day, return the number of slots used today
+        return Math.min(availableSlotsToday, remainingSlots);
       } else {
         // Check for overlap on subsequent days
         for (let app of appointmentsOnCurrentDay) {
           const existingStartIndex = timeSlots.indexOf(app.startTime);
           const existingEndIndex = existingStartIndex + app.details.expectedTime;
-
+    
           const spanStartIndex = 0;
           const spanEndIndex = Math.min(remainingSlots, timeSlots.length);
-
+    
           if (spanStartIndex < existingEndIndex && spanEndIndex > existingStartIndex) {
             return true; // Overlap detected on the next day
           }
         }
+    
+        // No overlap detected on the next day, return the number of slots used on this day
+        return Math.min(remainingSlots, timeSlots.length);
+      }
+    };
+    
 
-        // Subtract the slots used on this day
-        remainingSlots -= timeSlots.length;
+    // Check each day the appointment spans
+    while (remainingSlots > 0) {
+      iterationCount += 1;
+
+      if (iterationCount > 100) { // Safeguard: prevent infinite loop
+        console.error("Potential infinite loop detected in checkOverlap");
+        return false;
       }
 
+      // Check for overlap on the current date
+      const usedSlotsToday = checkDayOverlap(currentDate, startIndex, remainingSlots);
+      if (usedSlotsToday === true) {
+        console.log("Overlap detected on:", currentDate);
+        return true; // Overlap detected
+      }
+
+      // Decrement the remaining slots by the number of slots used today
+      remainingSlots -= usedSlotsToday;
+
       // Move to the next working day
-      currentDate = getNextWorkingDay(currentDate);
+      const nextWorkingDay = getNextWorkingDay(new Date(currentDate));
+      if (nextWorkingDay <= currentDate) {
+        console.error("getNextWorkingDay did not return a valid future date.");
+        break; // Prevent infinite loop if next day is not progressing
+      }
+      currentDate = nextWorkingDay;
     }
 
     return false; // No overlap detected
@@ -283,8 +310,19 @@ function AppointmentsPage() {
     let nextDay = new Date(currentDate);
     nextDay.setDate(nextDay.getDate() + 1);
 
+    // Safeguard: Log to check the date progression
+    console.log("Initial nextDay:", nextDay);
+
     while (isNonWorkingDay(nextDay)) {
       nextDay.setDate(nextDay.getDate() + 1);
+
+      // Add a safeguard to prevent the infinite loop
+      if (nextDay.getDate() === currentDate.getDate()) {
+        console.error("Infinite loop detected in getNextWorkingDay. The date is not progressing.");
+        break;
+      }
+
+      console.log("Adjusted nextDay:", nextDay);
     }
 
     return nextDay;
