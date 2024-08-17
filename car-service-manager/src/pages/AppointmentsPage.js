@@ -3,7 +3,7 @@ import Header from '../components/Header/Header';
 import Calendar from '../components/Calendar/Calendar';
 import AppointmentModal from '../components/AppointmentModal/AppointmentModal';
 import { firestore } from '../firebase'; // Import Firestore
-import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, setDoc, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, setDoc, onSnapshot, getDocs } from 'firebase/firestore';
 import DatePicker from '../components/DatePicker/DatePicker';
 import './AppointmentsPage.css';
 
@@ -19,7 +19,6 @@ function AppointmentsPage() {
     '01/01', '17/03', '25/12', '26/12', // Fixed date holidays
   ];
 
-  // Function to calculate dynamic holidays
   const getDynamicBankHolidays = (year) => {
     const getFirstMonday = (month) => {
       const firstDay = new Date(year, month, 1);
@@ -101,7 +100,9 @@ function AppointmentsPage() {
   const handleSaveAppointment = async (newAppointment) => {
     if (userRole !== 'admin') return; // Restrict saving for non-admin users
 
-    if (checkOverlap(newAppointment)) {
+    const sameDayOverlap = checkOverlap(newAppointment);
+
+    if (sameDayOverlap) {
       alert('This appointment overlaps with an existing appointment for this technician.');
       return; // Prevent saving if overlap is detected
     }
@@ -116,6 +117,15 @@ function AppointmentsPage() {
     if (totalSlotsNeeded > availableSlotsToday) {
       // Appointment spans into the next day
       const remainingSlots = totalSlotsNeeded - availableSlotsToday;
+
+      // Check for next-day overlap
+      const nextDay = getNextWorkingDay(new Date(newAppointment.date));
+      const nextDayOverlap = await checkNextDayOverlap(nextDay, remainingSlots, newAppointment.tech);
+
+      if (nextDayOverlap) {
+        alert('The appointment would overlap with an existing appointment on the next working day.');
+        return; // Prevent saving if overlap is detected on the next day
+      }
 
       // Create the first part of the appointment (today)
       const updatedAppointment = {
@@ -134,9 +144,6 @@ function AppointmentsPage() {
         const docRef = await addDoc(collection(firestore, 'appointments'), updatedAppointment);
         updatedAppointment.id = docRef.id;
       }
-
-      // Get the next working day
-      let nextDay = getNextWorkingDay(new Date(newAppointment.date));
 
       // Ensure no additional appointments are created if not needed
       if (remainingSlots > 0) {
@@ -188,6 +195,101 @@ function AppointmentsPage() {
     setIsModalOpen(false);
   };
 
+  const checkOverlap = (newAppointment) => {
+    const { startTime, details, tech, date } = newAppointment;
+    const startIndex = timeSlots.indexOf(startTime);
+    const appointmentDate = new Date(date);
+    const totalSlotsNeeded = details.expectedTime;
+
+    let remainingSlots = totalSlotsNeeded;
+    let currentDate = appointmentDate;
+
+    // Check each day the appointment spans
+    while (remainingSlots > 0) {
+      const isSameDay = currentDate.toDateString() === appointmentDate.toDateString();
+      const appointmentsOnCurrentDay = appointments.filter(app => {
+        return app.tech === tech && new Date(app.date).toDateString() === currentDate.toDateString();
+      });
+
+      if (isSameDay) {
+        // Calculate the available slots on the current day
+        const availableSlotsToday = timeSlots.length - startIndex;
+        const endIndex = startIndex + Math.min(availableSlotsToday, remainingSlots);
+
+        // Check for overlap on the same day
+        for (let app of appointmentsOnCurrentDay) {
+          const existingStartIndex = timeSlots.indexOf(app.startTime);
+          const existingEndIndex = existingStartIndex + app.details.expectedTime;
+
+          if (startIndex < existingEndIndex && endIndex > existingStartIndex) {
+            return true; // Overlap detected
+          }
+        }
+
+        // Subtract the slots used today from the remaining slots
+        remainingSlots -= availableSlotsToday;
+      } else {
+        // Check for overlap on subsequent days
+        for (let app of appointmentsOnCurrentDay) {
+          const existingStartIndex = timeSlots.indexOf(app.startTime);
+          const existingEndIndex = existingStartIndex + app.details.expectedTime;
+
+          const spanStartIndex = 0;
+          const spanEndIndex = Math.min(remainingSlots, timeSlots.length);
+
+          if (spanStartIndex < existingEndIndex && spanEndIndex > existingStartIndex) {
+            return true; // Overlap detected on the next day
+          }
+        }
+
+        // Subtract the slots used on this day
+        remainingSlots -= timeSlots.length;
+      }
+
+      // Move to the next working day
+      currentDate = getNextWorkingDay(currentDate);
+    }
+
+    return false; // No overlap detected
+  };
+
+  const checkNextDayOverlap = async (nextDay, remainingSlots, tech) => {
+    const q = query(collection(firestore, 'appointments'), where('date', '==', nextDay.toDateString()));
+    const querySnapshot = await getDocs(q);
+
+    const appointmentsOnNextDay = [];
+    querySnapshot.forEach(doc => {
+      appointmentsOnNextDay.push({ id: doc.id, ...doc.data() });
+    });
+
+    const spanStartIndex = 0;
+    const spanEndIndex = Math.min(remainingSlots, timeSlots.length);
+
+    for (let app of appointmentsOnNextDay) {
+      if (app.tech === tech) {
+        const existingStartIndex = timeSlots.indexOf(app.startTime);
+        const existingEndIndex = existingStartIndex + app.details.expectedTime;
+
+        if (spanStartIndex < existingEndIndex && spanEndIndex > existingStartIndex) {
+          return true; // Overlap detected
+        }
+      }
+    }
+
+    return false;
+  };
+
+  const getNextWorkingDay = (currentDate) => {
+    let nextDay = new Date(currentDate);
+    nextDay.setDate(nextDay.getDate() + 1);
+
+    while (isNonWorkingDay(nextDay)) {
+      nextDay.setDate(nextDay.getDate() + 1);
+    }
+
+    return nextDay;
+  };
+
   const handleDeleteAppointment = async (id) => {
     if (userRole !== 'admin') return; // Restrict deletion for non-admin users
 
@@ -224,67 +326,6 @@ function AppointmentsPage() {
           : app
       )
     );
-  };
-
-  const checkOverlap = (newAppointment) => {
-    const { startTime, details, tech, date } = newAppointment;
-    const startIndex = timeSlots.indexOf(startTime);
-    const endIndex = startIndex + details.expectedTime;
-
-    const appointmentDate = new Date(date);
-
-    for (let app of appointments) {
-      if (app.tech === tech) {
-        const appDate = new Date(app.date);
-        const existingStartIndex = timeSlots.indexOf(app.startTime);
-        const existingEndIndex = existingStartIndex + app.details.expectedTime;
-
-        // Check for same-day overlap
-        if (appDate.toDateString() === appointmentDate.toDateString()) {
-          if (startIndex < existingEndIndex && endIndex > existingStartIndex) {
-            return true; // Overlap detected
-          }
-        }
-
-        // Check for multi-day appointment overlap
-        let remainingSlots = details.expectedTime - (timeSlots.length - startIndex);
-        let nextAppointmentDate = new Date(appointmentDate);
-        nextAppointmentDate.setDate(nextAppointmentDate.getDate() + 1);
-
-        while (remainingSlots > 0 && !isNonWorkingDay(nextAppointmentDate)) {
-          const nextDayAppointments = appointments.filter(app =>
-            app.tech === tech && new Date(app.date).toDateString() === nextAppointmentDate.toDateString()
-          );
-
-          for (let nextDayApp of nextDayAppointments) {
-            const nextDayStartIndex = timeSlots.indexOf(nextDayApp.startTime);
-            const nextDayEndIndex = nextDayStartIndex + nextDayApp.details.expectedTime;
-
-            const spanStartIndex = 0;
-            const spanEndIndex = Math.min(remainingSlots, timeSlots.length);
-
-            if (spanStartIndex < nextDayEndIndex && spanEndIndex > nextDayStartIndex) {
-              return true; // Overlap detected on the next day
-            }
-          }
-
-          remainingSlots -= timeSlots.length;
-          nextAppointmentDate.setDate(nextAppointmentDate.getDate() + 1);
-        }
-      }
-    }
-    return false; // No overlap detected
-  };
-
-  const getNextWorkingDay = (currentDate) => {
-    let nextDay = new Date(currentDate);
-    nextDay.setDate(nextDay.getDate() + 1);
-
-    while (isNonWorkingDay(nextDay)) {
-      nextDay.setDate(nextDay.getDate() + 1);
-    }
-
-    return nextDay;
   };
 
   return (
