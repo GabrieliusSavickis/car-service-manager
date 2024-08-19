@@ -50,7 +50,11 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    // Automatically capitalize the Vehicle Reg field
+    const updatedValue = name === 'vehicleReg' ? value.toUpperCase() : value;
+
+    setFormData((prev) => ({ ...prev, [name]: updatedValue }));
   };
 
   const handleExpectedTimeChange = (e) => {
