@@ -196,7 +196,7 @@ function AppointmentsPage() {
   };
 
   const checkOverlap = (newAppointment) => {
-    const { startTime, details, tech, date } = newAppointment;
+    const { startTime, details, tech, date, id } = newAppointment; // Get the appointment ID
     const startIndex = timeSlots.indexOf(startTime);
     const appointmentDate = new Date(date);
     const totalSlotsNeeded = details.expectedTime;
@@ -209,24 +209,25 @@ function AppointmentsPage() {
     const checkDayOverlap = (currentDate, startIndex, remainingSlots) => {
       const isSameDay = currentDate.toDateString() === appointmentDate.toDateString();
       const appointmentsOnCurrentDay = appointments.filter(app => {
-        return app.tech === tech && new Date(app.date).toDateString() === currentDate.toDateString();
+        // Exclude the current appointment by checking the ID
+        return app.tech === tech && new Date(app.date).toDateString() === currentDate.toDateString() && app.id !== id;
       });
-    
+
       if (isSameDay) {
         // Calculate the available slots on the current day
         const availableSlotsToday = timeSlots.length - startIndex;
         const endIndex = startIndex + Math.min(availableSlotsToday, remainingSlots);
-    
+
         // Check for overlap on the same day
         for (let app of appointmentsOnCurrentDay) {
           const existingStartIndex = timeSlots.indexOf(app.startTime);
           const existingEndIndex = existingStartIndex + app.details.expectedTime;
-    
+
           if (startIndex < existingEndIndex && endIndex > existingStartIndex) {
             return true; // Overlap detected
           }
         }
-    
+
         // No overlap detected on the same day, return the number of slots used today
         return Math.min(availableSlotsToday, remainingSlots);
       } else {
@@ -234,20 +235,19 @@ function AppointmentsPage() {
         for (let app of appointmentsOnCurrentDay) {
           const existingStartIndex = timeSlots.indexOf(app.startTime);
           const existingEndIndex = existingStartIndex + app.details.expectedTime;
-    
+
           const spanStartIndex = 0;
           const spanEndIndex = Math.min(remainingSlots, timeSlots.length);
-    
+
           if (spanStartIndex < existingEndIndex && spanEndIndex > existingStartIndex) {
             return true; // Overlap detected on the next day
           }
         }
-    
+
         // No overlap detected on the next day, return the number of slots used on this day
         return Math.min(remainingSlots, timeSlots.length);
       }
     };
-    
 
     // Check each day the appointment spans
     while (remainingSlots > 0) {
