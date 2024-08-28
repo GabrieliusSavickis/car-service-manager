@@ -98,102 +98,103 @@ function AppointmentsPage() {
   };
 
   const handleSaveAppointment = async (newAppointment) => {
-    if (userRole !== 'admin') return; // Restrict saving for non-admin users
+    // Allow technicians to save only if the appointment already exists (has an ID)
+    if (userRole !== 'admin' && !newAppointment.id) {
+        alert('Technicians cannot create new appointments. Please contact an admin.');
+        return;
+    }
 
     const sameDayOverlap = checkOverlap(newAppointment);
 
     if (sameDayOverlap) {
-      alert('This appointment overlaps with an existing appointment for this technician.');
-      return; // Prevent saving if overlap is detected
+        alert('This appointment overlaps with an existing appointment for this technician.');
+        return; // Prevent saving if overlap is detected
     }
 
+    // Determine if the appointment spans multiple days
     const workdayEndIndex = timeSlots.indexOf(endOfWorkDay);
     const startTimeIndex = timeSlots.indexOf(newAppointment.startTime);
     const totalSlotsNeeded = newAppointment.details.expectedTime;
 
-    // Calculate available slots on the first day
-    const availableSlotsToday = workdayEndIndex - startTimeIndex; // Only up to the end of the day
+    const availableSlotsToday = workdayEndIndex - startTimeIndex;
 
     if (totalSlotsNeeded > availableSlotsToday) {
-      // Appointment spans into the next day
-      const remainingSlots = totalSlotsNeeded - availableSlotsToday;
+        // Handle multi-day appointments
+        const remainingSlots = totalSlotsNeeded - availableSlotsToday;
+        const nextDay = getNextWorkingDay(new Date(newAppointment.date));
+        const nextDayOverlap = await checkNextDayOverlap(nextDay, remainingSlots, newAppointment.tech);
 
-      // Check for next-day overlap
-      const nextDay = getNextWorkingDay(new Date(newAppointment.date));
-      const nextDayOverlap = await checkNextDayOverlap(nextDay, remainingSlots, newAppointment.tech);
+        if (nextDayOverlap) {
+            alert('The appointment would overlap with an existing appointment on the next working day.');
+            return; // Prevent saving if overlap is detected on the next day
+        }
 
-      if (nextDayOverlap) {
-        alert('The appointment would overlap with an existing appointment on the next working day.');
-        return; // Prevent saving if overlap is detected on the next day
-      }
-
-      // Create the first part of the appointment (today)
-      const updatedAppointment = {
-        ...newAppointment,
-        details: {
-          ...newAppointment.details,
-          expectedTime: availableSlotsToday, // Only fill the available slots today
-        },
-      };
-
-      // Save the first part
-      if (updatedAppointment.id) {
-        const appointmentRef = doc(firestore, 'appointments', updatedAppointment.id);
-        await updateDoc(appointmentRef, updatedAppointment);
-      } else {
-        const docRef = await addDoc(collection(firestore, 'appointments'), updatedAppointment);
-        updatedAppointment.id = docRef.id;
-      }
-
-      // Ensure no additional appointments are created if not needed
-      if (remainingSlots > 0) {
-        // Create the second part of the appointment (next available working day)
-        const nextDayAppointment = {
-          ...newAppointment,
-          date: nextDay.toDateString(),
-          startTime: workdayStart,
-          details: {
-            ...newAppointment.details,
-            expectedTime: remainingSlots, // Remaining time that spans into the next day
-          },
+        // Split the appointment into two parts (today and next working day)
+        const updatedAppointment = {
+            ...newAppointment,
+            details: {
+                ...newAppointment.details,
+                expectedTime: availableSlotsToday,
+            },
         };
 
-        // Save the second part
-        await addDoc(collection(firestore, 'appointments'), nextDayAppointment);
-      }
+        if (updatedAppointment.id) {
+            const appointmentRef = doc(firestore, 'appointments', updatedAppointment.id);
+            await updateDoc(appointmentRef, updatedAppointment);
+        } else {
+            const docRef = await addDoc(collection(firestore, 'appointments'), updatedAppointment);
+            updatedAppointment.id = docRef.id;
+        }
+
+        if (remainingSlots > 0) {
+            const nextDayAppointment = {
+                ...newAppointment,
+                date: nextDay.toDateString(),
+                startTime: workdayStart,
+                details: {
+                    ...newAppointment.details,
+                    expectedTime: remainingSlots,
+                },
+            };
+
+            await addDoc(collection(firestore, 'appointments'), nextDayAppointment);
+        }
     } else {
-      // Save normally if it doesn't span into the next day
-      if (newAppointment.id) {
-        const appointmentRef = doc(firestore, 'appointments', newAppointment.id);
-        await updateDoc(appointmentRef, newAppointment);
-      } else {
-        const docRef = await addDoc(collection(firestore, 'appointments'), newAppointment);
-        newAppointment.id = docRef.id; // Set the ID of the new appointment
-      }
+        // Save normally if it doesn't span into the next day
+        if (newAppointment.id) {
+            const appointmentRef = doc(firestore, 'appointments', newAppointment.id);
+            await updateDoc(appointmentRef, newAppointment);
+        } else {
+            const docRef = await addDoc(collection(firestore, 'appointments'), newAppointment);
+            newAppointment.id = docRef.id;
+        }
     }
 
-    // Update accounts
+    // Update the associated account information
     const accountRef = doc(firestore, 'accounts', newAppointment.details.vehicleReg);
     const accountData = {
-      vehicleReg: newAppointment.details.vehicleReg,
-      customerName: newAppointment.details.customerName,
-      customerPhone: newAppointment.details.customerPhone,
-      vehicleMake: newAppointment.details.vehicleMake,
+        vehicleReg: newAppointment.details.vehicleReg,
+        customerName: newAppointment.details.customerName,
+        customerPhone: newAppointment.details.customerPhone,
+        vehicleMake: newAppointment.details.vehicleMake,
     };
 
     await setDoc(accountRef, accountData, { merge: true });
 
     setAppointments((prev) => {
-      const existingAppointmentIndex = prev.findIndex(app => app.id === newAppointment.id);
-      if (existingAppointmentIndex !== -1) {
-        const updatedAppointments = [...prev];
-        updatedAppointments[existingAppointmentIndex] = newAppointment;
-        return updatedAppointments;
-      }
-      return [...prev, newAppointment];
+        const existingAppointmentIndex = prev.findIndex(app => app.id === newAppointment.id);
+        if (existingAppointmentIndex !== -1) {
+            const updatedAppointments = [...prev];
+            updatedAppointments[existingAppointmentIndex] = newAppointment;
+            return updatedAppointments;
+        }
+        return [...prev, newAppointment];
     });
+
     setIsModalOpen(false);
-  };
+};
+
+
 
   const checkOverlap = (newAppointment) => {
     const { startTime, details, tech, date, id } = newAppointment; // Get the appointment ID
@@ -385,7 +386,7 @@ function AppointmentsPage() {
         <AppointmentModal
           appointment={selectedAppointment}
           startTime={selectedAppointment?.startTime}  // Pass the startTime prop
-          onSave={userRole === 'admin' ? handleSaveAppointment : null}
+          onSave={handleSaveAppointment} // Allow both admin and technicians to save appointments
           onDelete={userRole === 'admin' ? handleDeleteAppointment : null}
           onClose={() => setIsModalOpen(false)}
           onCheckIn={handleCheckIn}  // Pass the check-in handler

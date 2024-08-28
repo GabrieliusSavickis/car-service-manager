@@ -201,7 +201,8 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
             Check In
           </button>
 
-          <button type="submit" disabled={userRole !== 'admin'}>Save Appointment</button>
+          {/* Enable save button if user is an admin or the appointment already exists (technician updating) */}
+          <button type="submit" disabled={userRole !== 'admin' && !appointment.id}>Save Appointment</button>
           {appointment.id && (
             <button
               type="button"
