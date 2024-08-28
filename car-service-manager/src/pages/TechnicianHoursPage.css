@@ -1,0 +1,39 @@
+/* TechnicianHoursPage.css */
+
+.technician-hours-container {
+    text-align: center;
+    margin-top: 20px;
+  }
+  
+  h1 {
+    margin-bottom: 20px;
+  }
+  
+  .date-picker-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+  
+  table {
+    width: 80%;
+    margin: 0 auto;
+    border-collapse: collapse;
+  }
+  
+  th, td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+  }
+  
+  th {
+    background-color: #f4f4f4;
+  }
+  
+  tr:hover {
+    background-color: #f9f9f9;
+  }
+
+  
+  
