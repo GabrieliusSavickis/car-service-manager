@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './AppointmentModal.css';
-import { FaCircle, FaCheckCircle } from 'react-icons/fa'; // Use icons for checkbox
+import { FaCircle, FaCheckCircle } from 'react-icons/fa';
 
 const timeOptions = [
   { label: '30 minutes', value: 1 },
@@ -29,8 +29,14 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     customerPhone: '',
     expectedTime: 1,
     tasks: [],
-    inProgress: false,  // Track if the appointment is in progress
-    newTasksAdded: false, // Track if a new task was added after check-in
+    inProgress: false,  
+    newTasksAdded: false, 
+    startTime: null,
+    pausedTime: null,
+    resumeTime: null,
+    totalPausedDuration: 0,
+    totalTimeSpent: null,
+    isPaused: false,
   });
 
   const [newTask, setNewTask] = useState('');
@@ -51,7 +57,6 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    // Automatically capitalize the Vehicle Reg field
     const updatedValue = name === 'vehicleReg' ? value.toUpperCase() : value;
 
     setFormData((prev) => ({ ...prev, [name]: updatedValue }));
@@ -67,7 +72,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     setFormData((prev) => ({
       ...prev,
       tasks: [...prev.tasks, { text: newTask, completed: false, completedBy: null }],
-      newTasksAdded: formData.inProgress ? true : false, // Only set this if the appointment is in progress
+      newTasksAdded: formData.inProgress ? true : false,
     }));
     setNewTask('');
   };
@@ -77,16 +82,49 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       const updatedTasks = [...prev.tasks];
       updatedTasks[index].completed = !updatedTasks[index].completed;
       updatedTasks[index].completedBy = updatedTasks[index].completed ? username : null;
-      return { ...prev, tasks: updatedTasks };
+
+      const allTasksCompleted = updatedTasks.every(task => task.completed);
+      let totalTimeSpent = null;
+
+      if (allTasksCompleted && !formData.totalTimeSpent) {
+        const currentTime = new Date();
+        const totalActiveTime = (currentTime - new Date(formData.startTime)) - formData.totalPausedDuration;
+        totalTimeSpent = totalActiveTime;
+      }
+
+      return { ...prev, tasks: updatedTasks, totalTimeSpent };
     });
   };
 
   const handleCheckIn = () => {
+    const startTime = new Date();
+
     setFormData((prev) => ({
       ...prev,
-      inProgress: true,  // Mark appointment as in-progress
+      inProgress: true,
+      startTime,
     }));
-    onCheckIn(appointment.id);  // Callback to change color in Calendar
+    onCheckIn(appointment.id);
+  };
+
+  const handlePause = () => {
+    setFormData((prev) => ({
+      ...prev,
+      isPaused: true,
+      pausedTime: new Date(),
+    }));
+  };
+
+  const handleResume = () => {
+    const resumeTime = new Date();
+    const pauseDuration = resumeTime - new Date(formData.pausedTime);
+
+    setFormData((prev) => ({
+      ...prev,
+      isPaused: false,
+      resumeTime,
+      totalPausedDuration: prev.totalPausedDuration + pauseDuration,
+    }));
   };
 
   const handleDeleteTask = (index) => {
@@ -105,7 +143,6 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   };
 
   const handleModalOpen = () => {
-    // Reset the newTasksAdded flag when the modal is opened (appointment reviewed)
     setFormData((prev) => ({
       ...prev,
       newTasksAdded: false,
@@ -121,20 +158,17 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   };
 
   useEffect(() => {
-    handleModalOpen(); // Reset color when the modal opens
+    handleModalOpen();
   }, []);
 
   return (
     <div className="modal">
       <div className="modal-content">
         <span className="close" onClick={onClose}>&times;</span>
-        
-        {/* Display the start time when creating a new appointment */}
+
         {!appointment.id && <h2>New Appointment at {startTime}</h2>}
-        
-        {/* Display 'Edit Appointment' for existing appointments */}
         {appointment.id && <h2>Edit Appointment</h2>}
-        
+
         <form onSubmit={handleSubmit}>
           <label>
             Vehicle Reg:
@@ -163,7 +197,6 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
             </select>
           </label>
 
-          {/* To-do List Section */}
           <div className="todo-list-section">
             <label>To-Do List:</label>
             <ul className="todo-list">
@@ -191,29 +224,42 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
             </div>
           </div>
 
-          {/* Check-In Button */}
-          <button 
-            type="button" 
-            className="checkin-button" 
-            onClick={handleCheckIn} 
-            disabled={formData.inProgress} 
-            style={{ display: formData.inProgress ? 'none' : 'inline-block' }}>
-            Check In
-          </button>
+          {!formData.inProgress && (
+            <button type="button" className="checkin-button" onClick={handleCheckIn}>
+              Check In
+            </button>
+          )}
 
-          {/* Enable save button if user is an admin or the appointment already exists (technician updating) */}
-          <button type="submit" disabled={userRole !== 'admin' && !appointment.id}>Save Appointment</button>
+          {formData.inProgress && !formData.isPaused && (
+            <button type="button" className="pause-button" onClick={handlePause}>
+              Pause Appointment
+            </button>
+          )}
+
+          {formData.inProgress && formData.isPaused && (
+            <button type="button" className="resume-button" onClick={handleResume}>
+              Resume Appointment
+            </button>
+          )}
+
+          <button type="submit" disabled={userRole !== 'admin' && !appointment.id}>
+            Save Appointment
+          </button>
           {appointment.id && (
             <button
               type="button"
               className="delete-button"
               onClick={handleDelete}
-              disabled={userRole !== 'admin'}  // Disable for non-admins
+              disabled={userRole !== 'admin'}
             >
               Delete Appointment
             </button>
           )}
         </form>
+
+        {formData.totalTimeSpent && (
+          <p>Total Time Spent: {Math.floor(formData.totalTimeSpent / 60000)} minutes</p>
+        )}
       </div>
     </div>
   );
