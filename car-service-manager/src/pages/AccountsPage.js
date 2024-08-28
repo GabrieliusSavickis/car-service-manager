@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { firestore } from '../firebase'; 
+import { firestore } from '../firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import Header from '../components/Header/Header';
 import './AccountsPage.css';
@@ -16,7 +16,7 @@ const AccountsPage = () => {
   // Fetch the user role from sessionStorage
   useEffect(() => {
     const role = sessionStorage.getItem('userRole');
-    
+
     // If the role is not available or the user is a technician, redirect to appointments
     if (!role || role === 'technician') {
       navigate('/appointments');
@@ -49,15 +49,22 @@ const AccountsPage = () => {
   };
 
   const handleViewServiceHistory = async (vehicleReg) => {
-    // Fetch service history from Firestore based on vehicle reg
     const appointmentsRef = collection(firestore, 'appointments');
     const q = query(appointmentsRef, where('details.vehicleReg', '==', vehicleReg));
     const querySnapshot = await getDocs(q);
-    const appointmentsList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const appointmentsList = querySnapshot.docs.map(doc => {
+      const appointment = doc.data();
+      return {
+        id: doc.id,
+        ...appointment,
+        formattedDate: appointment.date // Use the date field directly
+      };
+    });
 
-    setSelectedAccount(vehicleReg); // Set the selected account
-    setServiceHistory(appointmentsList); // Set the service history
+    setSelectedAccount(vehicleReg);
+    setServiceHistory(appointmentsList);
   };
+
 
   return (
     <div className="accounts-page">
@@ -122,8 +129,8 @@ const AccountsPage = () => {
                 {serviceHistory.length > 0 ? (
                   serviceHistory.map(appointment => (
                     <li key={appointment.id}>
-                      <strong>Date:</strong> {appointment.startTime} <br />
-                      <strong>Description:</strong> 
+                      <strong>Date:</strong> {appointment.formattedDate} <br />
+                      <strong>Description: </strong>
                       <span className="description-preview">
                         {appointment.details.tasks && appointment.details.tasks.length > 0
                           ? appointment.details.tasks.map(task => task.text).join(', ')
@@ -136,6 +143,7 @@ const AccountsPage = () => {
                 ) : (
                   <p>No service history available for this vehicle.</p>
                 )}
+
               </ul>
             </div>
             <button onClick={() => setSelectedAccount(null)}>Close</button>
