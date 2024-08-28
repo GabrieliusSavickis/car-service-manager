@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import DatePicker from 'react-datepicker'; // Import DatePicker from react-datepicker
-import 'react-datepicker/dist/react-datepicker.css'; // Import the css for react-datepicker
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import { firestore } from '../firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import './TechnicianHoursPage.css';
 import Header from '../components/Header/Header';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCalendarAlt } from '@fortawesome/free-solid-svg-icons';
 
 const TechnicianHoursPage = () => {
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date());
   const [technicianHours, setTechnicianHours] = useState([]);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
   useEffect(() => {
     const fetchTechnicianHours = async () => {
@@ -17,7 +20,7 @@ const TechnicianHoursPage = () => {
       startOfDay.setHours(0, 0, 0, 0);
 
       const endOfDay = new Date(endDate);
-      endOfDay.setHours(23, 59, 59, 999); // Ensure the end time includes the whole day
+      endOfDay.setHours(23, 59, 59, 999);
 
       const q = query(
         collection(firestore, 'appointments'),
@@ -57,22 +60,33 @@ const TechnicianHoursPage = () => {
       <Header />
       <div className="technician-hours-container">
         <h1>Technician Hours</h1>
-        <div className="date-picker-container">
-          <DatePicker
-            selected={startDate}
-            onChange={(dates) => {
-              if (Array.isArray(dates)) {
-                const [start, end] = dates;
-                setStartDate(start);
-                setEndDate(end || start); // If the end date is not selected, use the start date
-              }
-            }}
-            startDate={startDate}
-            endDate={endDate}
-            selectsRange
-            inline
-          />
+        
+        <div className="date-picker-trigger">
+          <button 
+            onClick={() => setIsDatePickerOpen(!isDatePickerOpen)} 
+            className="calendar-icon-button"
+          >
+            <FontAwesomeIcon icon={faCalendarAlt} size="2x" />
+          </button>
+          
+          {isDatePickerOpen && (
+            <div className="date-picker-container">
+              <DatePicker
+                selected={startDate}
+                onChange={(dates) => {
+                  const [start, end] = dates;
+                  setStartDate(start);
+                  setEndDate(end);
+                }}
+                startDate={startDate}
+                endDate={endDate}
+                selectsRange
+                inline
+              />
+            </div>
+          )}
         </div>
+
         <table>
           <thead>
             <tr>
