@@ -1,24 +1,30 @@
-// src/components/PrintableJobCard.js
 import React from 'react';
-import './PrintableJobCard.css'; // Use a different CSS file for print styles
+import './PrintableJobCard.css';
 
-const PrintableJobCard = ({ appointment }) => {
+function PrintableJobCard({ appointment }) {
+  // Use optional chaining to safely access appointment properties
+  const vehicleReg = appointment?.details?.vehicleReg || 'N/A';
+  const vehicleMake = appointment?.details?.vehicleMake || 'N/A';
+  const customerName = appointment?.details?.customerName || 'N/A';
+  const customerPhone = appointment?.details?.customerPhone || 'N/A';
+  const tasks = appointment?.details?.tasks || [];
+
   return (
-    <div className="printable-job-card">
-      <h2>Job Card for {appointment.details.vehicleReg}</h2>
-      <p><strong>Vehicle Make:</strong> {appointment.details.vehicleMake}</p>
-      <p><strong>Customer Name:</strong> {appointment.details.customerName}</p>
-      <p><strong>Customer Phone:</strong> {appointment.details.customerPhone}</p>
-      <p><strong>Technician:</strong> {appointment.tech}</p>
-      <p><strong>Date:</strong> {appointment.date}</p>
-      <p><strong>Tasks:</strong></p>
+    <div className="job-card">
+      <h2>Job Card</h2>
+      <p><strong>Vehicle Reg:</strong> {vehicleReg}</p>
+      <p><strong>Vehicle Make:</strong> {vehicleMake}</p>
+      <p><strong>Customer Name:</strong> {customerName}</p>
+      <p><strong>Customer Phone:</strong> {customerPhone}</p>
+
+      <h3>Tasks</h3>
       <ul>
-        {appointment.details.tasks.map((task, index) => (
+        {tasks.length > 0 ? tasks.map((task, index) => (
           <li key={index}>{task.text}</li>
-        ))}
+        )) : <li>No tasks added</li>}
       </ul>
     </div>
   );
-};
+}
 
 export default PrintableJobCard;

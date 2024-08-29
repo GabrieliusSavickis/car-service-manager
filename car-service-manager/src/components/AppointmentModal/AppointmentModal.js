@@ -6,7 +6,22 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import PrintableJobCard from '../PrintableJobCard/PrintableJobCard';
 
 const timeOptions = [
-  // ... timeOptions array remains unchanged ...
+  { label: '30 minutes', value: 1 },
+  { label: '1 hour', value: 2 },
+  { label: '1.5 hours', value: 3 },
+  { label: '2 hours', value: 4 },
+  { label: '2.5 hours', value: 5 },
+  { label: '3 hours', value: 6 },
+  { label: '3.5 hours', value: 7 },
+  { label: '4 hours', value: 8 },
+  { label: '4.5 hours', value: 9 },
+  { label: '5 hours', value: 10 },
+  { label: '5.5 hours', value: 11 },
+  { label: '6 hours', value: 12 },
+  { label: '6.5 hours', value: 13 },
+  { label: '7 hours', value: 14 },
+  { label: '7.5 hours', value: 15 },
+  { label: '8 hours', value: 16 },
 ];
 
 function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, startTime }) {
@@ -39,6 +54,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
 
     if (appointment.details) {
       setFormData(appointment.details);
+      console.log('Loaded appointment details:', appointment.details);
     }
   }, [appointment]);
 
@@ -47,7 +63,6 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     const updatedValue = name === 'vehicleReg' ? value.toUpperCase() : value;
     setFormData((prev) => ({ ...prev, [name]: updatedValue }));
 
-    // Check if vehicleReg exists in Firestore
     if (name === 'vehicleReg' && updatedValue.trim() !== '') {
       const accountsCollection = collection(firestore, 'accounts');
       const q = query(accountsCollection, where('vehicleReg', '==', updatedValue));
@@ -66,6 +81,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   };
 
   const handleExpectedTimeChange = (e) => {
+    console.log('Selected time value:', e.target.value);
     setFormData((prev) => ({ ...prev, expectedTime: parseInt(e.target.value) }));
   };
 
@@ -119,7 +135,6 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   const handleResume = () => {
     const resumeTime = new Date();
     const pauseDuration = resumeTime - new Date(formData.pausedTime);
-
     setFormData((prev) => ({
       ...prev,
       isPaused: false,
@@ -160,18 +175,19 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
 
   // Add the handlePrint function
   const handlePrint = () => {
+    const printContent = document.getElementById('printable-area').innerHTML;
     const printWindow = window.open('', '_blank');
-    printWindow.document.write(
-      `<html>
+    printWindow.document.write(`
+      <html>
         <head>
           <title>Print Job Card</title>
           <link rel="stylesheet" type="text/css" href="PrintableJobCard.css" />
         </head>
         <body>
-          <div>${document.getElementById('printable-area').innerHTML}</div>
+          ${printContent}
         </body>
-      </html>`
-    );
+      </html>
+    `);
     printWindow.document.close();
     printWindow.focus();
     printWindow.print();
@@ -186,7 +202,6 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     <div className="modal">
       <div className="modal-content">
         <span className="close" onClick={onClose}>&times;</span>
-
         <div className="modal-header">
           {!appointment.id && <h2>New Appointment at {startTime}</h2>}
           {appointment.id && <h2>Edit Appointment</h2>}
@@ -212,7 +227,12 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
           </label>
           <label>
             Expected Time:
-            <select name="expectedTime" value={formData.expectedTime} onChange={handleExpectedTimeChange} required>
+            <select
+              name="expectedTime"
+              value={formData.expectedTime || 1}
+              onChange={handleExpectedTimeChange}
+              required
+            >
               {timeOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
@@ -254,13 +274,11 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
                 Check In
               </button>
             )}
-
             {formData.inProgress && !formData.isPaused && (
               <button type="button" className="pause-button" onClick={handlePause}>
                 Pause Appointment
               </button>
             )}
-
             {formData.inProgress && formData.isPaused && (
               <button type="button" className="resume-button" onClick={handleResume}>
                 Resume Appointment
@@ -287,10 +305,10 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
           <p>Total Time Spent: {Math.floor(formData.totalTimeSpent / 60000)} minutes</p>
         )}
 
-        {/* Hidden printable area */}
         <div id="printable-area" style={{ display: 'none' }}>
-          <PrintableJobCard appointment={appointment} />
+          <PrintableJobCard appointment={appointment || { details: {} }} />
         </div>
+
       </div>
     </div>
   );
