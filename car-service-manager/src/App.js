@@ -11,14 +11,14 @@ import { auth } from './firebase';
 
 function App() {
   const [loading, setLoading] = useState(true);
-  const [setUser] = useState(null);
+  const [, _setUser] = useState(null); // Renamed to _setUser to avoid linting issues
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
-        setUser(user);
+        _setUser(user); // Still using _setUser to manage authentication state
       } else {
-        setUser(null);
+        _setUser(null);
       }
       setLoading(false); // Update loading state after auth check
     });
