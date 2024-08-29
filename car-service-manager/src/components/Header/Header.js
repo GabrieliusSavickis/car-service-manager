@@ -56,7 +56,7 @@ function Header() {
       <nav className="nav-links">
         <Link to="/appointments" className="nav-link">Appointments</Link>
         <Link to="/accounts" className="nav-link">Accounts</Link>
-        <Link to="/technician-hours" className="nav-link">Dashboard</Link> {/* New link to Technician Hours page */}
+        <Link to="/technician-hours" className="nav-link">Hours</Link> {/* New link to Technician Hours page */}
         {username && <span className="username-display">Logged in as <span className="username">{username}</span></span>} {/* Display username */}
         <FontAwesomeIcon
           icon={faSignOutAlt}
