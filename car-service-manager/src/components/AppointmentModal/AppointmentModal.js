@@ -41,6 +41,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     totalPausedDuration: 0,
     totalTimeSpent: null,
     isPaused: false,
+    comments: '', // New field for comments
   });
 
   const [newTask, setNewTask] = useState('');
@@ -198,64 +199,77 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
           />
         </div>
 
+        <form onSubmit={handleSubmit} className="appointment-form">
+          <div className="left-section">
+            <label>
+              Vehicle Reg:
+              <input type="text" name="vehicleReg" value={formData.vehicleReg} onChange={handleChange} required />
+            </label>
+            <label>
+              Vehicle Make:
+              <input type="text" name="vehicleMake" value={formData.vehicleMake} onChange={handleChange} />
+            </label>
+            <label>
+              Customer Name:
+              <input type="text" name="customerName" value={formData.customerName} onChange={handleChange} />
+            </label>
+            <label>
+              Customer Phone:
+              <input type="text" name="customerPhone" value={formData.customerPhone} onChange={handleChange} required />
+            </label>
+            <label>
+              Expected Time:
+              <select
+                name="expectedTime"
+                value={formData.expectedTime || 1}
+                onChange={handleExpectedTimeChange}
+                required
+              >
+                {timeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
 
-        <form onSubmit={handleSubmit}>
-          <label>
-            Vehicle Reg:
-            <input type="text" name="vehicleReg" value={formData.vehicleReg} onChange={handleChange} required />
-          </label>
-          <label>
-            Vehicle Make:
-            <input type="text" name="vehicleMake" value={formData.vehicleMake} onChange={handleChange} />
-          </label>
-          <label>
-            Customer Name:
-            <input type="text" name="customerName" value={formData.customerName} onChange={handleChange} />
-          </label>
-          <label>
-            Customer Phone:
-            <input type="text" name="customerPhone" value={formData.customerPhone} onChange={handleChange} required />
-          </label>
-          <label>
-            Expected Time:
-            <select
-              name="expectedTime"
-              value={formData.expectedTime || 1}
-              onChange={handleExpectedTimeChange}
-              required
-            >
-              {timeOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="right-section">
+            <div className="todo-list-section">
+              <label>To-Do List:</label>
+              <ul className="todo-list">
+                {formData.tasks.map((task, index) => (
+                  <li key={index} className={`task-item ${task.completed ? 'completed' : ''}`}>
+                    <span className="task-circle" onClick={() => handleToggleTaskCompletion(index)}>
+                      {task.completed ? <FaCheckCircle /> : <FaCircle />}
+                    </span>
+                    <span className="task-text">{task.text}</span>
+                    {task.completed && (
+                      <span className="completed-by"> (Completed by: {task.completedBy})</span>
+                    )}
+                    <button type="button" onClick={() => handleDeleteTask(index)}>Delete</button>
+                  </li>
+                ))}
+              </ul>
+              <div className="new-task-input">
+                <input
+                  type="text"
+                  value={newTask}
+                  onChange={(e) => setNewTask(e.target.value)}
+                  placeholder="Add a new task"
+                />
+                <button type="button" onClick={handleAddTask}>Add Task</button>
+              </div>
+            </div>
 
-          <div className="todo-list-section">
-            <label>To-Do List:</label>
-            <ul className="todo-list">
-              {formData.tasks.map((task, index) => (
-                <li key={index} className={`task-item ${task.completed ? 'completed' : ''}`}>
-                  <span className="task-circle" onClick={() => handleToggleTaskCompletion(index)}>
-                    {task.completed ? <FaCheckCircle /> : <FaCircle />}
-                  </span>
-                  <span className="task-text">{task.text}</span>
-                  {task.completed && (
-                    <span className="completed-by"> (Completed by: {task.completedBy})</span>
-                  )}
-                  <button type="button" onClick={() => handleDeleteTask(index)}>Delete</button>
-                </li>
-              ))}
-            </ul>
-            <div className="new-task-input">
-              <input
-                type="text"
-                value={newTask}
-                onChange={(e) => setNewTask(e.target.value)}
-                placeholder="Add a new task"
+            <div className="comments-section">
+              <label>Comments:</label>
+              <textarea
+                name="comments"
+                value={formData.comments}
+                onChange={(e) => setFormData((prev) => ({ ...prev, comments: e.target.value }))}
+                placeholder="Add any additional notes here..."
               />
-              <button type="button" onClick={handleAddTask}>Add Task</button>
             </div>
           </div>
 

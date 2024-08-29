@@ -15,7 +15,7 @@
   background-color: #fff;
   padding: 20px;
   border-radius: 5px;
-  width: 500px;
+  width: 500px; /* Increased width to accommodate the new layout */
   position: relative;
 }
 
@@ -69,7 +69,7 @@ form button:hover {
 }
 
 .todo-list-section {
-  margin-top: 20px;
+  margin-bottom: 20px;
 }
 
 .todo-list {
@@ -153,4 +153,17 @@ form button:hover {
 
 .button-group button {
   flex: 1;
+}
+
+.comments-section {
+  margin-top: 20px;
+}
+
+.comments-section textarea {
+  width: 90%;
+  height: 80px;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  resize: none;
 }
