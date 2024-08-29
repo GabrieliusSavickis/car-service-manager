@@ -1,147 +1,156 @@
 .modal {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 1000;
-  }
-  
-  .modal-content {
-    background-color: #fff;
-    padding: 20px;
-    border-radius: 5px;
-    width: 500px;
-    position: relative;
-  }
-  
-  .close {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    font-size: 1.5rem;
-    cursor: pointer;
-  }
-  
-  form {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  
-  form label {
-    display: flex;
-    flex-direction: column;
-    font-weight: bold;
-  }
-  
-  form input, form textarea {
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-  }
-  
-  form button {
-    padding: 10px;
-    background-color: #c23b22;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-  
-  form button:hover {
-    background-color: #a32e1c;
-  }
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+}
 
-  .delete-button {
-    background-color: #d9534f;
-    margin-top: 10px;
-  }
-  
-  .delete-button:hover {
-    background-color: #c9302c;
-  }
+.modal-content {
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 5px;
+  width: 500px;
+  position: relative;
+}
 
-  .todo-list-section {
-    margin-top: 20px;
-  }
-  
-  .todo-list {
-    list-style-type: none;
-    padding: 0;
-  }
-  
-  .task-item {
-    display: flex;
-    align-items: center;
-    margin-bottom: 10px;
-  }
-  
-  .task-circle {
-    cursor: pointer;
-    margin-right: 10px;
-  }
-  
-  .task-text {
-    flex-grow: 1;
-  }
-  
-  .completed {
-    color: gray;
-  }
-  
-  .completed-by {
-    margin-left: 10px;
-    font-style: italic;
-    color: #777;
-  }
-  
-  .new-task-input {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  
-  .new-task-input input {
-    flex-grow: 1;
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-  }
-  
-  .new-task-input button {
-    padding: 8px 12px;
-    background-color: #2297c2;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-  
-  .new-task-input button:hover {
-    background-color: #1e86ae;
-  }
+.close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
 
-  .modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  
-  .print-icon {
-    cursor: pointer;
-    font-size: 1.5rem;
-    color: #333; /* Adjust color to match your theme */
-    margin-left: 10px;
-  }
-  
-  .print-icon:hover {
-    color: #c23b22; /* Change color on hover */
-  }
-  
-  
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+form label {
+  display: flex;
+  flex-direction: column;
+  font-weight: bold;
+}
+
+form input, form textarea {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+form button {
+  padding: 10px;
+  background-color: #c23b22;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+form button:hover {
+  background-color: #a32e1c;
+}
+
+.delete-button {
+  background-color: #d9534f;
+  margin-top: 10px;
+  width: 100%; /* Make delete button full width */
+}
+
+.delete-button:hover {
+  background-color: #c9302c;
+}
+
+.todo-list-section {
+  margin-top: 20px;
+}
+
+.todo-list {
+  list-style-type: none;
+  padding: 0;
+}
+
+.task-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.task-circle {
+  cursor: pointer;
+  margin-right: 10px;
+}
+
+.task-text {
+  flex-grow: 1;
+}
+
+.completed {
+  color: gray;
+}
+
+.completed-by {
+  margin-left: 10px;
+  font-style: italic;
+  color: #777;
+}
+
+.new-task-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.new-task-input input {
+  flex-grow: 1;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.new-task-input button {
+  padding: 8px 12px;
+  background-color: #2297c2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.new-task-input button:hover {
+  background-color: #1e86ae;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.print-icon {
+  cursor: pointer;
+  font-size: 1.5rem;
+  color: #333; /* Adjust color to match your theme */
+  margin-left: 10px;
+}
+
+.print-icon:hover {
+  color: #c23b22; /* Change color on hover */
+}
+
+/* Align buttons side by side */
+.button-group {
+  display: flex;
+  gap: 10px;
+}
+
+.button-group button {
+  flex: 1;
+}
