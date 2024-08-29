@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import './AppointmentModal.css';
 import { FaCircle, FaCheckCircle } from 'react-icons/fa';
+import { firestore } from '../../firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 const timeOptions = [
   { label: '30 minutes', value: 1 },
@@ -29,8 +31,8 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     customerPhone: '',
     expectedTime: 1,
     tasks: [],
-    inProgress: false,  
-    newTasksAdded: false, 
+    inProgress: false,
+    newTasksAdded: false,
     startTime: null,
     pausedTime: null,
     resumeTime: null,
@@ -54,12 +56,29 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     }
   }, [appointment]);
 
-  const handleChange = (e) => {
+  const handleChange = async (e) => {
     const { name, value } = e.target;
 
     const updatedValue = name === 'vehicleReg' ? value.toUpperCase() : value;
 
     setFormData((prev) => ({ ...prev, [name]: updatedValue }));
+
+    // Check if vehicleReg exists in Firestore
+    if (name === 'vehicleReg' && updatedValue.trim() !== '') {
+      const accountsCollection = collection(firestore, 'accounts');
+      const q = query(accountsCollection, where('vehicleReg', '==', updatedValue));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const accountData = querySnapshot.docs[0].data(); // Assuming vehicleReg is unique
+        setFormData((prev) => ({
+          ...prev,
+          vehicleMake: accountData.vehicleMake || '',
+          customerName: accountData.customerName || '',
+          customerPhone: accountData.customerPhone || '',
+        }));
+      }
+    }
   };
 
   const handleExpectedTimeChange = (e) => {
