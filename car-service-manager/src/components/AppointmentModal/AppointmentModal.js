@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './AppointmentModal.css';
-import { FaCircle, FaCheckCircle, FaPrint } from 'react-icons/fa'; // Import the print icon
+import { FaCircle, FaCheckCircle, FaPrint } from 'react-icons/fa';
 import { firestore } from '../../firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import PrintableJobCard from '../PrintableJobCard/PrintableJobCard';
+import ReactToPrint from 'react-to-print';
 
 const timeOptions = [
   { label: '30 minutes', value: 1 },
@@ -45,6 +46,8 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   const [newTask, setNewTask] = useState('');
   const [userRole, setUserRole] = useState('');
   const [username, setUsername] = useState('');
+
+  const componentRef = useRef(); // Reference to the PrintableJobCard component
 
   useEffect(() => {
     const role = sessionStorage.getItem('userRole');
@@ -114,8 +117,6 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     });
   };
 
-
-
   const handleCheckIn = () => {
     const startTime = new Date();
     setFormData((prev) => ({
@@ -175,27 +176,6 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     }
   };
 
-  // Add the handlePrint function
-  const handlePrint = () => {
-    const printContent = document.getElementById('printable-area').innerHTML;
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Print Job Card</title>
-          <link rel="stylesheet" type="text/css" href="PrintableJobCard.css" />
-        </head>
-        <body>
-          ${printContent}
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-    printWindow.close();
-  };
-
   useEffect(() => {
     handleModalOpen();
   }, []);
@@ -207,8 +187,17 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
         <div className="modal-header">
           {!appointment.id && <h2>New Appointment at {startTime}</h2>}
           {appointment.id && <h2>Edit Appointment</h2>}
-          <FaPrint className="print-icon" onClick={handlePrint} title="Print Job Card" />
+          <ReactToPrint
+            trigger={() => {
+              console.log('Print button clicked'); // Log when the print button is clicked
+              return <FaPrint className="print-icon" title="Print Job Card" />;
+            }}
+            content={() => componentRef.current}
+            onBeforePrint={() => console.log('Before print')} // Log just before print
+            onAfterPrint={() => console.log('After print')}  // Log after print
+          />
         </div>
+
 
         <form onSubmit={handleSubmit}>
           <label>
@@ -307,11 +296,10 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
           <p>Total Time Spent: {Math.floor(formData.totalTimeSpent / 60000)} minutes</p>
         )}
 
-
+        {/* Hidden printable area */}
         <div id="printable-area" style={{ display: 'none' }}>
-          <PrintableJobCard appointment={appointment || { details: {} }} />
+          <PrintableJobCard ref={componentRef} appointment={appointment || { details: {} }} />
         </div>
-
       </div>
     </div>
   );
