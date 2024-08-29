@@ -126,5 +126,22 @@
   .new-task-input button:hover {
     background-color: #1e86ae;
   }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .print-icon {
+    cursor: pointer;
+    font-size: 1.5rem;
+    color: #333; /* Adjust color to match your theme */
+    margin-left: 10px;
+  }
+  
+  .print-icon:hover {
+    color: #c23b22; /* Change color on hover */
+  }
   
   

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import './AppointmentModal.css';
-import { FaCircle, FaCheckCircle } from 'react-icons/fa';
+import { FaCircle, FaCheckCircle, FaPrint } from 'react-icons/fa'; // Import the print icon
 import { firestore } from '../../firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
+import PrintableJobCard from '../PrintableJobCard/PrintableJobCard';
 
 const timeOptions = [
   { label: '30 minutes', value: 1 },
@@ -176,6 +177,26 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     }
   };
 
+  // Add the handlePrint function
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(
+      `<html>
+        <head>
+          <title>Print Job Card</title>
+          <link rel="stylesheet" type="text/css" href="PrintableJobCard.css" />
+        </head>
+        <body>
+          <div>${document.getElementById('printable-area').innerHTML}</div>
+        </body>
+      </html>`
+    );
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+    printWindow.close();
+  };
+
   useEffect(() => {
     handleModalOpen();
   }, []);
@@ -185,8 +206,11 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       <div className="modal-content">
         <span className="close" onClick={onClose}>&times;</span>
 
-        {!appointment.id && <h2>New Appointment at {startTime}</h2>}
-        {appointment.id && <h2>Edit Appointment</h2>}
+        <div className="modal-header">
+          {!appointment.id && <h2>New Appointment at {startTime}</h2>}
+          {appointment.id && <h2>Edit Appointment</h2>}
+          <FaPrint className="print-icon" onClick={handlePrint} title="Print Job Card" />
+        </div>
 
         <form onSubmit={handleSubmit}>
           <label>
@@ -279,6 +303,11 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
         {formData.totalTimeSpent && (
           <p>Total Time Spent: {Math.floor(formData.totalTimeSpent / 60000)} minutes</p>
         )}
+
+        {/* Hidden printable area */}
+        <div id="printable-area" style={{ display: 'none' }}>
+          <PrintableJobCard appointment={appointment} />
+        </div>
       </div>
     </div>
   );
