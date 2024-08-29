@@ -114,6 +114,8 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     });
   };
 
+
+
   const handleCheckIn = () => {
     const startTime = new Date();
     setFormData((prev) => ({
@@ -304,6 +306,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
         {formData.totalTimeSpent && (
           <p>Total Time Spent: {Math.floor(formData.totalTimeSpent / 60000)} minutes</p>
         )}
+
 
         <div id="printable-area" style={{ display: 'none' }}>
           <PrintableJobCard appointment={appointment || { details: {} }} />
