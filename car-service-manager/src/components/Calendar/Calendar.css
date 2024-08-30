@@ -115,34 +115,4 @@
   }
 }
 
-/* Smaller portrait screens (e.g., smaller tablets or phones) */
-@media screen and (max-width: 600px) {
-  .calendar-container {
-    grid-template-columns: 60px repeat(4, 1fr); /* Further adjust for very narrow screens */
-    margin: 5px auto;
-  }
 
-  .time-label {
-    width: 30px; /* Further reduce time label width */
-    padding: 6px; /* Further adjust padding for time labels */
-  }
-
-  .appointment {
-    font-size: 0.65rem; /* Further reduce font size */
-    padding: 2px; /* Further adjust padding for appointments */
-  }
-
-  .calendar-header {
-    font-size: 0.8rem;
-    padding: 4px; /* Further reduce padding */
-  }
-
-  .lunch-break-divider {
-    height: 28px; /* Further reduce height for lunch break divider */
-    font-size: 0.9rem; /* Further adjust font size for lunch label */
-  }
-
-  .lunch-break-label {
-    font-size: 0.9rem; /* Further adjust font size for lunch break text */
-  }
-}
