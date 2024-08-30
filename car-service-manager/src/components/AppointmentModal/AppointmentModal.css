@@ -193,4 +193,12 @@ form button:hover {
     max-height: 85vh; /* Reduce height slightly for tablets */
     overflow-y: auto;
   }
+
+  .todo-list-section {
+    max-height: 250px; /* Reduce max height for to-do list on tablets */
+  }
+
+  .comments-section textarea {
+    height: 60px; /* Adjust comment box height for tablets */
+  }
 }
