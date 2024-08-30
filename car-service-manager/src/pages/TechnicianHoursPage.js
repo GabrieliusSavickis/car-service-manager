@@ -33,14 +33,18 @@ const TechnicianHoursPage = () => {
 
       querySnapshot.forEach((doc) => {
         const appointment = doc.data();
-        const { tech, details } = appointment;
+        const { tasks } = appointment.details || {};
 
-        if (!hoursData[tech]) {
-          hoursData[tech] = 0;
+        if (tasks) {
+          tasks.forEach((task) => {
+            if (task.completed && task.completedBy) {
+              if (!hoursData[task.completedBy]) {
+                hoursData[task.completedBy] = 0;
+              }
+              hoursData[task.completedBy] += (task.timeSpent || 0) * 60000; // Convert minutes to milliseconds
+            }
+          });
         }
-
-        const totalTimeSpent = details.totalTimeSpent || 0;
-        hoursData[tech] += totalTimeSpent;
       });
 
       const formattedHours = Object.keys(hoursData).map((tech) => ({
