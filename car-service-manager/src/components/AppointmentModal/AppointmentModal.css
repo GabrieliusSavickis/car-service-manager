@@ -167,3 +167,20 @@ form button:hover {
   border-radius: 4px;
   resize: none;
 }
+
+.technician-time-section {
+  margin-top: 20px;
+  padding: 10px;
+  border-top: 1px solid #ccc;
+}
+
+.technician-time-section h3 {
+  margin-bottom: 10px;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.technician-time-section p {
+  margin: 5px 0;
+  font-size: 16px;
+}

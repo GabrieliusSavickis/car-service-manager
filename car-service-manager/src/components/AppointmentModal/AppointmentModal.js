@@ -41,7 +41,9 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     totalPausedDuration: 0,
     totalTimeSpent: null,
     isPaused: false,
-    comments: '', // New field for comments
+    comments: '',
+    technicianTimes: {}, // Stores the total time spent by each technician
+    currentTechnician: null, // Track the currently active technician
   });
 
   const [newTask, setNewTask] = useState('');
@@ -102,19 +104,38 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   const handleToggleTaskCompletion = (index) => {
     setFormData((prev) => {
       const updatedTasks = [...prev.tasks];
-      updatedTasks[index].completed = !updatedTasks[index].completed;
-      updatedTasks[index].completedBy = updatedTasks[index].completed ? username : null;
+      const currentTask = updatedTasks[index];
+      const technician = username; // Assuming username is the current technician
 
-      const allTasksCompleted = updatedTasks.every(task => task.completed);
-      let totalTimeSpent = null;
+      const currentTime = new Date();
+      let timeSpent = 0;
 
-      if (allTasksCompleted && !formData.totalTimeSpent) {
-        const currentTime = new Date();
-        const totalActiveTime = (currentTime - new Date(formData.startTime)) - formData.totalPausedDuration;
-        totalTimeSpent = totalActiveTime;
+      if (prev.resumeTime) {
+        // Calculate time spent since last resume
+        timeSpent = Math.floor((currentTime - new Date(prev.resumeTime)) / 60000);
+      } else if (prev.startTime) {
+        // If the task is the first one, calculate from startTime
+        timeSpent = Math.floor((currentTime - new Date(prev.startTime)) / 60000);
       }
 
-      return { ...prev, tasks: updatedTasks, totalTimeSpent };
+      currentTask.completed = !currentTask.completed;
+      currentTask.completedBy = technician;
+      currentTask.timeSpent = timeSpent;
+
+      // Update technician's total time
+      const updatedTechnicianTimes = { ...prev.technicianTimes };
+      if (updatedTechnicianTimes[technician]) {
+        updatedTechnicianTimes[technician] += timeSpent;
+      } else {
+        updatedTechnicianTimes[technician] = timeSpent;
+      }
+
+      return {
+        ...prev,
+        tasks: updatedTasks,
+        resumeTime: currentTask.completed ? currentTime : null, // Reset resumeTime
+        technicianTimes: updatedTechnicianTimes,
+      };
     });
   };
 
@@ -124,26 +145,40 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       ...prev,
       inProgress: true,
       startTime,
+      currentTechnician: username, // Track which technician checked in
     }));
     onCheckIn(appointment.id);
   };
 
   const handlePause = () => {
-    setFormData((prev) => ({
-      ...prev,
-      isPaused: true,
-      pausedTime: new Date(),
-    }));
+    const pauseTime = new Date();
+    setFormData((prev) => {
+      const technicianTime = pauseTime - new Date(prev.resumeTime || prev.startTime);
+      const updatedTechnicianTimes = { ...prev.technicianTimes };
+
+      // Add the time spent to the current technician's total
+      if (updatedTechnicianTimes[prev.currentTechnician]) {
+        updatedTechnicianTimes[prev.currentTechnician] += Math.floor(technicianTime / 60000);
+      } else {
+        updatedTechnicianTimes[prev.currentTechnician] = Math.floor(technicianTime / 60000);
+      }
+
+      return {
+        ...prev,
+        isPaused: true,
+        pausedTime: pauseTime,
+        technicianTimes: updatedTechnicianTimes,
+      };
+    });
   };
 
   const handleResume = () => {
     const resumeTime = new Date();
-    const pauseDuration = resumeTime - new Date(formData.pausedTime);
     setFormData((prev) => ({
       ...prev,
       isPaused: false,
       resumeTime,
-      totalPausedDuration: prev.totalPausedDuration + pauseDuration,
+      currentTechnician: username, // Update to the current technician
     }));
   };
 
@@ -245,12 +280,15 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
                     </span>
                     <span className="task-text">{task.text}</span>
                     {task.completed && (
-                      <span className="completed-by"> (Completed by: {task.completedBy})</span>
+                      <span className="completed-by">
+                        (Completed by: {task.completedBy} in {task.timeSpent}m)
+                      </span>
                     )}
                     <button type="button" onClick={() => handleDeleteTask(index)}>Delete</button>
                   </li>
                 ))}
               </ul>
+
               <div className="new-task-input">
                 <input
                   type="text"
@@ -305,10 +343,6 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
             </button>
           )}
         </form>
-
-        {formData.totalTimeSpent && (
-          <p>Total Time Spent: {Math.floor(formData.totalTimeSpent / 60000)} minutes</p>
-        )}
 
         {/* Hidden printable area */}
         <div id="printable-area" style={{ display: 'none' }}>
