@@ -86,12 +86,12 @@
 @media screen and (max-width: 800px) {
   .calendar-container {
     grid-template-columns: 70px repeat(4, 1fr); /* Adjust for narrower screens */
-    margin: 5px auto; /* Reduce margin on smaller screens */
+    margin: 10px auto; /* Reduce margin on smaller screens */
   }
 
   .time-label {display: inline-grid;
     width: 35px; /* Narrow time labels */
-    padding: 8px; /* Adjust padding for time labels */
+    padding: 7px; /* Adjust padding for time labels */
   }
 
 
