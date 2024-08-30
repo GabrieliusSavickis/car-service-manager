@@ -10,32 +10,37 @@ import { firestore } from '../../firebase';
 function Header() {
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
+  const [userRole, setUserRole] = useState('');
 
   useEffect(() => {
-    const fetchUsername = async () => {
+    const fetchUserData = async () => {
       const user = auth.currentUser;
 
       if (user) {
-        // Check if username is stored in session storage first
+        // Check if username and role are stored in session storage first
         let storedUsername = sessionStorage.getItem('username');
-        
-        if (storedUsername) {
+        let storedRole = sessionStorage.getItem('userRole');
+
+        if (storedUsername && storedRole) {
           setUsername(storedUsername);
+          setUserRole(storedRole);
         } else {
-          // If not, fetch it from Firestore
+          // If not, fetch them from Firestore
           const q = query(collection(firestore, 'users'), where('email', '==', user.email));
           const querySnapshot = await getDocs(q);
 
           if (!querySnapshot.empty) {
             const userData = querySnapshot.docs[0].data();
             setUsername(userData.username);
+            setUserRole(userData.role); // Assuming role is stored in the user data
             sessionStorage.setItem('username', userData.username); // Store it in session storage for faster access
+            sessionStorage.setItem('userRole', userData.role); // Store role in session storage
           }
         }
       }
     };
 
-    fetchUsername();
+    fetchUserData();
   }, []);
 
   const handleLogout = async () => {
@@ -48,6 +53,11 @@ function Header() {
     }
   };
 
+  // Don't render the header for technicians
+  if (userRole === 'technician') {
+    return null;
+  }
+
   return (
     <header className="header">
       <div className="logo-container">
@@ -56,8 +66,8 @@ function Header() {
       <nav className="nav-links">
         <Link to="/appointments" className="nav-link">Appointments</Link>
         <Link to="/accounts" className="nav-link">Accounts</Link>
-        <Link to="/technician-hours" className="nav-link">Hours</Link> {/* New link to Technician Hours page */}
-        {username && <span className="username-display">Logged in as <span className="username">{username}</span></span>} {/* Display username */}
+        <Link to="/technician-hours" className="nav-link">Hours</Link>
+        {username && <span className="username-display">Logged in as <span className="username">{username}</span></span>}
         <FontAwesomeIcon
           icon={faSignOutAlt}
           className="logout-icon"
