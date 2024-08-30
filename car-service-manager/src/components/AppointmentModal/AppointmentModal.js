@@ -332,12 +332,12 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
             </button>
           </div>
 
-          {appointment.id && (
+          {/* Only show the delete button if the user is an admin */}
+          {userRole === 'admin' && appointment.id && (
             <button
               type="button"
               className="delete-button"
               onClick={handleDelete}
-              disabled={userRole !== 'admin'}
             >
               Delete Appointment
             </button>
