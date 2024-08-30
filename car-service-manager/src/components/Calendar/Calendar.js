@@ -15,7 +15,7 @@ const timeSlots = [
 ];
 
 
-const technicians = ['Technician 1', 'Technician 2', 'Technician 3', 'Technician 4'];
+const technicians = ['Audrius', 'Adomas', 'Igor', 'Vitalik'];
 
 const Calendar = ({ appointments, onTimeSlotClick }) => {
 
