@@ -184,3 +184,13 @@ form button:hover {
   margin: 5px 0;
   font-size: 16px;
 }
+
+/* Add responsiveness for tablet portrait mode */
+@media screen and (max-width: 800px) {
+  .modal-content {
+    width: 100%;
+    max-width: 450px; /* Slightly smaller for tablet */
+    max-height: 85vh; /* Reduce height slightly for tablets */
+    overflow-y: auto;
+  }
+}
