@@ -38,7 +38,6 @@
   border: 1px solid #ddd;
   position: relative;
   overflow: visible;
- 
 }
 
 .time-slot.lunch-time-slot {
@@ -81,4 +80,76 @@
   text-align: center;
   font-size: 1.2rem;
   color: #555;
+}
+
+/* Tablet-specific styles in portrait mode */
+@media screen and (max-width: 800px) {
+  .calendar-container {
+    grid-template-columns: 70px repeat(4, 1fr); /* Adjust for narrower screens */
+    margin: 10px auto; /* Reduce margin on smaller screens */
+  }
+
+  .time-label {
+    width: 35px; /* Narrow time labels */
+    padding: 8px; /* Adjust padding for time labels */
+  }
+
+  .time-slot {
+    width: 70px; /* Narrow time slots */
+  }
+
+  .appointment {
+    font-size: 0.7rem; /* Reduce font size for better fit */
+    padding: 3px; /* Adjust padding for appointments */
+  }
+
+  .calendar-header {
+    font-size: 0.85rem; /* Adjust header font size */
+    padding: 5px; /* Reduce padding for header */
+  }
+
+  .lunch-break-divider {
+    height: 30px; /* Reduce height for lunch break divider */
+    font-size: 1rem; /* Adjust font size for lunch label */
+  }
+
+  .lunch-break-label {
+    font-size: 1rem; /* Adjust font size for lunch break text */
+  }
+}
+
+/* Smaller portrait screens (e.g., smaller tablets or phones) */
+@media screen and (max-width: 600px) {
+  .calendar-container {
+    grid-template-columns: 60px repeat(4, 1fr); /* Further adjust for very narrow screens */
+    margin: 5px auto;
+  }
+
+  .time-label {
+    width: 30px; /* Further reduce time label width */
+    padding: 6px; /* Further adjust padding for time labels */
+  }
+
+  .time-slot {
+    width: 60px; /* Further reduce time slot width */
+  }
+
+  .appointment {
+    font-size: 0.65rem; /* Further reduce font size */
+    padding: 2px; /* Further adjust padding for appointments */
+  }
+
+  .calendar-header {
+    font-size: 0.8rem;
+    padding: 4px; /* Further reduce padding */
+  }
+
+  .lunch-break-divider {
+    height: 28px; /* Further reduce height for lunch break divider */
+    font-size: 0.9rem; /* Further adjust font size for lunch label */
+  }
+
+  .lunch-break-label {
+    font-size: 0.9rem; /* Further adjust font size for lunch break text */
+  }
 }
