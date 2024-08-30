@@ -94,9 +94,6 @@
     padding: 8px; /* Adjust padding for time labels */
   }
 
-  .time-slot {
-    width: 70px; /* Narrow time slots */
-  }
 
   .appointment {
     font-size: 0.7rem; /* Reduce font size for better fit */
@@ -128,10 +125,6 @@
   .time-label {
     width: 30px; /* Further reduce time label width */
     padding: 6px; /* Further adjust padding for time labels */
-  }
-
-  .time-slot {
-    width: 60px; /* Further reduce time slot width */
   }
 
   .appointment {
