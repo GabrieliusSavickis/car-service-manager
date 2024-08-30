@@ -90,7 +90,7 @@
   }
 
   .time-label {display: inline-grid;
-    width: 45px; /* Narrow time labels */
+    width: 60px; /* Narrow time labels */
     padding: 7px; /* Adjust padding for time labels */
   }
 
