@@ -4,6 +4,7 @@ import './PrintableJobCard.css';
 const PrintableJobCard = forwardRef(({ appointment }, ref) => {
   const details = appointment?.details || {};
   const tasks = details.tasks || [];
+  const comments = details.comments || ''; // Retrieve the comments
 
   return (
     <div ref={ref} className="job-card">
@@ -19,6 +20,14 @@ const PrintableJobCard = forwardRef(({ appointment }, ref) => {
           <li key={index}>{task.text}</li>
         )) : <li>No tasks added</li>}
       </ul>
+
+      {/* Add the comments section */}
+      {comments && (
+        <div className="comments-section">
+          <h3>Comments</h3>
+          <p>{comments}</p>
+        </div>
+      )}
     </div>
   );
 });
