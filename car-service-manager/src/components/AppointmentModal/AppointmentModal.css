@@ -202,7 +202,6 @@ form button:hover {
   }
 }
 
-
 .icon-group {
   display: flex;
   gap: 10px;
@@ -249,4 +248,24 @@ form button:hover {
 
 .reschedule-content button:hover {
   background-color: #1e86ae;
+}
+
+.time-validation-section {
+  margin-top: 5px;
+}
+
+.expected-time-label,
+.validation-checkbox {
+  display: inline-block; /* Ensures the elements are inline */
+  vertical-align: middle; /* Aligns the elements vertically */
+  margin: 0;
+}
+
+.validation-checkbox input {
+  margin-right: 5px; /* Space between the checkbox and the text */
+  vertical-align: middle; /* Aligns the checkbox with the text */
+}
+
+.time-validation-controls select {
+  width: 120px; /* Adjust this value to make the select field wider */
 }

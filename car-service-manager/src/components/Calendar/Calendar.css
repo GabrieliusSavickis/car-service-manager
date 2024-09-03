@@ -46,7 +46,6 @@
 }
 
 .appointment {
-  background-color: #2297c2; /* Change color as needed */
   color: #fff;
   padding: 5px;
   border-radius: 5px;
@@ -62,6 +61,7 @@
   overflow: hidden;
   z-index: 1;
   box-sizing: border-box;
+  transition: background-color 0.3s ease; /* Smooth transition for color changes */
 }
 
 /* New styles for lunch break */
@@ -89,11 +89,11 @@
     margin: 10px auto; /* Reduce margin on smaller screens */
   }
 
-  .time-label {display: inline-grid;
+  .time-label {
+    display: inline-grid;
     width: 58px; /* Narrow time labels */
     padding: 7px; /* Adjust padding for time labels */
   }
-
 
   .appointment {
     font-size: 0.7rem; /* Reduce font size for better fit */
@@ -114,5 +114,3 @@
     font-size: 1rem; /* Adjust font size for lunch break text */
   }
 }
-
-

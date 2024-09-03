@@ -27,7 +27,6 @@ const timeOptions = [
 
 const technicianOptions = ['Audrius', 'Adomas', 'Igor', 'Vitalik']; // Assuming these are your technician names
 
-
 function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, startTime }) {
   const [formData, setFormData] = useState({
     vehicleReg: '',
@@ -35,6 +34,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     customerName: '',
     customerPhone: '',
     expectedTime: 1,
+    needsValidation: false, // New state for validation
     tasks: [],
     inProgress: false,
     newTasksAdded: false,
@@ -72,7 +72,18 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   }, [appointment]);
 
   const handleChange = async (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
+
+    // Handle checkbox separately
+    if (type === 'checkbox') {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: checked,
+        expectedTime: checked ? 1 : prev.expectedTime, // Set to 30 minutes if checked
+      }));
+      return;
+    }
+
     const updatedValue = name === 'vehicleReg' ? value.toUpperCase() : value;
     setFormData((prev) => ({ ...prev, [name]: updatedValue }));
 
@@ -272,35 +283,73 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
           <div className="left-section">
             <label>
               Vehicle Reg:
-              <input type="text" name="vehicleReg" value={formData.vehicleReg} onChange={handleChange} required />
+              <input
+                type="text"
+                name="vehicleReg"
+                value={formData.vehicleReg}
+                onChange={handleChange}
+                required
+              />
             </label>
             <label>
               Vehicle Make:
-              <input type="text" name="vehicleMake" value={formData.vehicleMake} onChange={handleChange} />
+              <input
+                type="text"
+                name="vehicleMake"
+                value={formData.vehicleMake}
+                onChange={handleChange}
+              />
             </label>
             <label>
               Customer Name:
-              <input type="text" name="customerName" value={formData.customerName} onChange={handleChange} />
+              <input
+                type="text"
+                name="customerName"
+                value={formData.customerName}
+                onChange={handleChange}
+              />
             </label>
             <label>
               Customer Phone:
-              <input type="text" name="customerPhone" value={formData.customerPhone} onChange={handleChange} required />
-            </label>
-            <label>
-              Expected Time:
-              <select
-                name="expectedTime"
-                value={formData.expectedTime || 1}
-                onChange={handleExpectedTimeChange}
+              <input
+                type="text"
+                name="customerPhone"
+                value={formData.customerPhone}
+                onChange={handleChange}
                 required
-              >
-                {timeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
+
+            {/* Updated Expected Time and Needs Validation */}
+            <div className="time-validation-section">
+              <label className="expected-time-label">
+                Expected Time:
+              </label>
+              <div className="time-validation-controls">
+                <select
+                  name="expectedTime"
+                  value={formData.needsValidation ? 1 : formData.expectedTime}
+                  onChange={handleExpectedTimeChange}
+                  disabled={formData.needsValidation} // Disable if needs validation
+                  required={!formData.needsValidation} // Not required if needs validation
+                >
+                  {timeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <label className="validation-checkbox">
+                  <input
+                    type="checkbox"
+                    name="needsValidation"
+                    checked={formData.needsValidation}
+                    onChange={handleChange}
+                  />
+                  Time Needs Confirmation
+                </label>
+              </div>
+            </div>
           </div>
 
           <div className="right-section">

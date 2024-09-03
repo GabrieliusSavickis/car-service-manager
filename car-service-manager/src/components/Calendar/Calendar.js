@@ -14,7 +14,6 @@ const timeSlots = [
   '17:00', '17:30',
 ];
 
-
 const technicians = ['Audrius', 'Adomas', 'Igor', 'Vitalik'];
 
 const Calendar = ({ appointments, onTimeSlotClick }) => {
@@ -54,6 +53,9 @@ const Calendar = ({ appointments, onTimeSlotClick }) => {
   };
 
   const getAppointmentColor = (appointment) => {
+    if (appointment.details.needsValidation) {
+      return '#f44336';  // Red if the appointment needs validation
+    }
     if (appointment.details.newTasksAdded) {
       return '#f44336';  // Red if new tasks were added after check-in
     }
