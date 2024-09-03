@@ -134,14 +134,13 @@ form button:hover {
   align-items: center;
 }
 
-.print-icon {
+.print-icon, .reschedule-icon {
   cursor: pointer;
   font-size: 1.5rem;
   color: #333; /* Adjust color to match your theme */
-  margin-left: 10px;
 }
 
-.print-icon:hover {
+.print-icon:hover, .reschedule-icon:hover {
   color: #c23b22; /* Change color on hover */
 }
 
@@ -201,4 +200,53 @@ form button:hover {
   .comments-section textarea {
     height: 60px; /* Adjust comment box height for tablets */
   }
+}
+
+
+.icon-group {
+  display: flex;
+  gap: 10px;
+}
+
+.reschedule-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+  z-index: 1100;
+}
+
+.reschedule-content {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.reschedule-content label {
+  display: flex;
+  flex-direction: column;
+}
+
+.reschedule-content input,
+.reschedule-content select {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.reschedule-content button {
+  padding: 10px;
+  background-color: #2297c2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.reschedule-content button:hover {
+  background-color: #1e86ae;
 }

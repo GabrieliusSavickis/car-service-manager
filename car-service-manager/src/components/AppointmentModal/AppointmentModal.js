@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './AppointmentModal.css';
-import { FaCircle, FaCheckCircle, FaPrint } from 'react-icons/fa';
+import { FaCircle, FaCheckCircle, FaPrint, FaExchangeAlt } from 'react-icons/fa';
 import { firestore } from '../../firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import PrintableJobCard from '../PrintableJobCard/PrintableJobCard';
@@ -24,6 +24,9 @@ const timeOptions = [
   { label: '7.5 hours', value: 15 },
   { label: '8 hours', value: 16 },
 ];
+
+const technicianOptions = ['Audrius', 'Adomas', 'Igor', 'Vitalik']; // Assuming these are your technician names
+
 
 function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, startTime }) {
   const [formData, setFormData] = useState({
@@ -49,6 +52,10 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   const [newTask, setNewTask] = useState('');
   const [userRole, setUserRole] = useState('');
   const [username, setUsername] = useState('');
+  const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false); // State for reschedule modal
+  const [newTechnician, setNewTechnician] = useState('');
+  const [newDate, setNewDate] = useState('');
+  const [newTime, setNewTime] = useState('');
 
   const componentRef = useRef(); // Reference to the PrintableJobCard component
 
@@ -212,6 +219,24 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     }
   };
 
+  const handleReschedule = () => {
+    // Open the reschedule modal
+    setIsRescheduleModalOpen(true);
+  };
+
+  const handleRescheduleSubmit = () => {
+    // Reschedule the appointment
+    const updatedAppointment = {
+      ...appointment,
+      tech: newTechnician,
+      date: newDate,
+      startTime: newTime,
+    };
+
+    onSave(updatedAppointment);
+    setIsRescheduleModalOpen(false);
+  };
+
   useEffect(() => {
     handleModalOpen();
   }, []);
@@ -223,15 +248,24 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
         <div className="modal-header">
           {!appointment.id && <h2>New Appointment at {startTime}</h2>}
           {appointment.id && <h2>Edit Appointment</h2>}
-          <ReactToPrint
-            trigger={() => {
-              console.log('Print button clicked'); // Log when the print button is clicked
-              return <FaPrint className="print-icon" title="Print Job Card" />;
-            }}
-            content={() => componentRef.current}
-            onBeforePrint={() => console.log('Before print')} // Log just before print
-            onAfterPrint={() => console.log('After print')}  // Log after print
-          />
+          <div className="icon-group">
+            <ReactToPrint
+              trigger={() => {
+                console.log('Print button clicked');
+                return <FaPrint className="print-icon" title="Print Job Card" />;
+              }}
+              content={() => componentRef.current}
+              onBeforePrint={() => console.log('Before print')}
+              onAfterPrint={() => console.log('After print')}
+            />
+            {userRole === 'admin' && (
+              <FaExchangeAlt
+                className="reschedule-icon"
+                title="Reschedule Appointment"
+                onClick={handleReschedule}
+              />
+            )}
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="appointment-form">
@@ -343,6 +377,44 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
             </button>
           )}
         </form>
+
+        {isRescheduleModalOpen && (
+          <div className="reschedule-modal">
+            <div className="reschedule-content">
+              <h2>Reschedule Appointment</h2>
+              <label>
+                Technician:
+                <select
+                  value={newTechnician}
+                  onChange={(e) => setNewTechnician(e.target.value)}
+                >
+                  <option value="">Select Technician</option>
+                  {technicianOptions.map((tech) => (
+                    <option key={tech} value={tech}>{tech}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Date:
+                <input
+                  type="date"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                />
+              </label>
+              <label>
+                Time:
+                <input
+                  type="time"
+                  value={newTime}
+                  onChange={(e) => setNewTime(e.target.value)}
+                />
+              </label>
+              <button onClick={handleRescheduleSubmit}>Reschedule</button>
+              <button onClick={() => setIsRescheduleModalOpen(false)}>Cancel</button>
+            </div>
+          </div>
+        )}
 
         {/* Hidden printable area */}
         <div id="printable-area" style={{ display: 'none' }}>
