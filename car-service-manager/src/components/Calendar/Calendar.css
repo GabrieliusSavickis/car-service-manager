@@ -73,6 +73,7 @@
   align-items: center;
   height: 38px; /* Adjust height if needed */
   font-weight: bold;
+  /* z-index: 10; /* This makes the lunch break divider appear on top */
   color: #555;
 }
 
