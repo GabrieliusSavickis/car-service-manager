@@ -29,14 +29,12 @@ const Calendar = ({ appointments, onTimeSlotClick }) => {
       const currentSlot = timeSlots[i];
 
       if (currentSlot === '12:00') {
-        // Handles the case when appointment spans from 12:00 over the lunch break
         totalDuration += 1;  // Count the 12:00 slot
         remainingSlots -= 1;
 
         if (remainingSlots > 0) {
-          // Skip the lunch break, but we only add one visual slot after 12:00
-          totalDuration += 1;  // Add just one slot for the lunch break divider
-          i++; // Skip to 13:30, which is already accounted for by the divider
+          totalDuration += 1;  // Add one slot for the lunch break divider
+          i++; // Skip to 13:30
         }
       } else {
         totalDuration += 1;
@@ -44,7 +42,7 @@ const Calendar = ({ appointments, onTimeSlotClick }) => {
       }
     }
 
-    return totalDuration;  // Total slots that the appointment will span
+    return totalDuration;  // Total slots the appointment spans
   };
 
   const getAppointmentHeight = (duration) => {
@@ -67,6 +65,22 @@ const Calendar = ({ appointments, onTimeSlotClick }) => {
     return '#2297c2';  // Default blue for not checked-in
   };
 
+  const getAppointmentTaskText = (appointment, span) => {
+    const taskText = appointment.details.tasks && appointment.details.tasks.length > 0 
+      ? appointment.details.tasks.map(task => task.text).join(", ") 
+      : 'No tasks available';
+
+    // Set a dynamic character limit based on the span of the appointment
+    const baseLimit = 20; // Adjust this number as needed
+    const characterLimit = baseLimit * span;
+
+    if (taskText.length > characterLimit) {
+      return taskText.slice(0, characterLimit) + '...';
+    }
+
+    return taskText;
+  };
+
   return (
     <div className="calendar-container">
       <div className="calendar-header">
@@ -78,7 +92,6 @@ const Calendar = ({ appointments, onTimeSlotClick }) => {
       <div className="calendar-body">
         {timeSlots.map((time, index) => (
           <React.Fragment key={time}>
-            {/* Visual Divider for Lunch Break */}
             {time === '13:30' && (
               <div className="lunch-break-divider" key="lunch-break">
                 <div className="lunch-break-label">Lunch Break</div>
@@ -108,9 +121,7 @@ const Calendar = ({ appointments, onTimeSlotClick }) => {
                       >
                         <div>{appointment.details.vehicleReg}</div>
                         <div>
-                          {appointment.details.tasks && appointment.details.tasks.length > 0 
-                            ? appointment.details.tasks[0].text.slice(0, 20) + '...' 
-                            : 'No tasks available'}
+                          {getAppointmentTaskText(appointment, calculateAppointmentSpan(appointment))}
                         </div>
                       </div>
                     )}
