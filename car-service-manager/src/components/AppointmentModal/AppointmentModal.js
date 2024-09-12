@@ -79,7 +79,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       setFormData((prev) => ({
         ...prev,
         [name]: checked,
-        expectedTime: checked ? 1 : prev.expectedTime, // Set to 30 minutes if checked
+        // expectedTime: checked ? 1 : prev.expectedTime, - Set to 30 minutes if checked
       }));
       return;
     }
@@ -328,9 +328,8 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
               <div className="time-validation-controls">
                 <select
                   name="expectedTime"
-                  value={formData.needsValidation ? 1 : formData.expectedTime}
+                  value={formData.expectedTime}
                   onChange={handleExpectedTimeChange}
-                  disabled={formData.needsValidation} // Disable if needs validation
                   required={!formData.needsValidation} // Not required if needs validation
                 >
                   {timeOptions.map((option) => (
