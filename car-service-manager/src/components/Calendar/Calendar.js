@@ -57,6 +57,10 @@ const Calendar = ({ appointments, onTimeSlotClick }) => {
     if (appointment.details.newTasksAdded) {
       return '#f44336';  // Red if new tasks were added after check-in
     }
+    if (appointment.details.newCommentsAdded) {
+      console.log("Color set to red due to new comment.");
+      return '#f44336'; // Red if a new comment was added
+    }
     if (appointment.details.tasks.every(task => task.completed)) {
       return '#28a745';  // Green if all tasks are complete
     } else if (appointment.details.inProgress) {

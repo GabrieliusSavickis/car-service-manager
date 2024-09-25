@@ -27,28 +27,31 @@ const timeOptions = [
 
 const technicianOptions = ['Audrius', 'Adomas', 'Igor', 'Vitalik']; // Assuming these are your technician names
 
-function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, startTime }) {
-  const [formData, setFormData] = useState({
-    vehicleReg: '',
-    vehicleMake: '',
-    customerName: '',
-    customerPhone: '',
-    expectedTime: 1,
-    needsValidation: false, // New state for validation
-    tasks: [],
-    inProgress: false,
-    newTasksAdded: false,
-    startTime: null,
-    pausedTime: null,
-    resumeTime: null,
-    totalPausedDuration: 0,
-    totalTimeSpent: null,
-    isPaused: false,
-    comments: '',
-    technicianTimes: {}, // Stores the total time spent by each technician
-    currentTechnician: null, // Track the currently active technician
-  });
+// Define initial form data
+const initialFormData = {
+  vehicleReg: '',
+  vehicleMake: '',
+  customerName: '',
+  customerPhone: '',
+  expectedTime: 1,
+  needsValidation: false, // New state for validation
+  tasks: [],
+  inProgress: false,
+  newTasksAdded: false,
+  startTime: null,
+  pausedTime: null,
+  resumeTime: null,
+  totalPausedDuration: 0,
+  totalTimeSpent: null,
+  isPaused: false,
+  comments: '',
+  technicianTimes: {}, // Stores the total time spent by each technician
+  currentTechnician: null, // Track the currently active technician
+  newCommentsAdded: false, // Include this field as well
+};
 
+function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, startTime }) {
+  const [formData, setFormData] = useState(initialFormData);
   const [newTask, setNewTask] = useState('');
   const [userRole, setUserRole] = useState('');
   const [username, setUsername] = useState('');
@@ -56,6 +59,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   const [newTechnician, setNewTechnician] = useState('');
   const [newDate, setNewDate] = useState('');
   const [newTime, setNewTime] = useState('');
+  const [initialComments, setInitialComments] = useState('');
 
   const componentRef = useRef(); // Reference to the PrintableJobCard component
 
@@ -66,8 +70,14 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     setUsername(storedUsername);
 
     if (appointment.details) {
-      setFormData(appointment.details);
+      // Merge initialFormData with appointment.details to ensure all fields are present
+      setFormData({ ...initialFormData, ...appointment.details });
       console.log('Loaded appointment details:', appointment.details);
+      setInitialComments(appointment.details.comments || '');
+    } else {
+      // New appointment
+      setFormData({ ...initialFormData });
+      setInitialComments('');
     }
   }, [appointment]);
 
@@ -79,28 +89,43 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       setFormData((prev) => ({
         ...prev,
         [name]: checked,
-        // expectedTime: checked ? 1 : prev.expectedTime, - Set to 30 minutes if checked
       }));
       return;
     }
 
-    const updatedValue = name === 'vehicleReg' ? value.toUpperCase() : value;
-    setFormData((prev) => ({ ...prev, [name]: updatedValue }));
+    // Handle vehicleReg changes asynchronously
+    if (name === 'vehicleReg') {
+      const updatedValue = value.toUpperCase();
+      let updatedData = { [name]: updatedValue };
 
-    if (name === 'vehicleReg' && updatedValue.trim() !== '') {
-      const accountsCollection = collection(firestore, 'accounts');
-      const q = query(accountsCollection, where('vehicleReg', '==', updatedValue));
-      const querySnapshot = await getDocs(q);
+      if (updatedValue.trim() !== '') {
+        const accountsCollection = collection(firestore, 'accounts');
+        const q = query(accountsCollection, where('vehicleReg', '==', updatedValue));
+        const querySnapshot = await getDocs(q);
 
-      if (!querySnapshot.empty) {
-        const accountData = querySnapshot.docs[0].data(); // Assuming vehicleReg is unique
-        setFormData((prev) => ({
-          ...prev,
-          vehicleMake: accountData.vehicleMake || '',
-          customerName: accountData.customerName || '',
-          customerPhone: accountData.customerPhone || '',
-        }));
+        if (!querySnapshot.empty) {
+          const accountData = querySnapshot.docs[0].data(); // Assuming vehicleReg is unique
+          updatedData = {
+            ...updatedData,
+            vehicleMake: accountData.vehicleMake || '',
+            customerName: accountData.customerName || '',
+            customerPhone: accountData.customerPhone || '',
+          };
+        }
       }
+
+      setFormData((prev) => ({ ...prev, ...updatedData }));
+      return;
+    }
+
+    // For comments, simply update the comments in formData
+    if (name === 'comments') {
+      setFormData((prev) => ({
+        ...prev,
+        comments: value,
+      }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
     }
   };
 
@@ -114,7 +139,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     setFormData((prev) => ({
       ...prev,
       tasks: [...prev.tasks, { text: newTask, completed: false, completedBy: null }],
-      newTasksAdded: formData.inProgress ? true : false,
+      newTasksAdded: prev.inProgress ? true : false,
     }));
     setNewTask('');
   };
@@ -210,8 +235,25 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
 
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    console.log("Submitting form. formData.newCommentsAdded:", formData.newCommentsAdded);
+
+    let formDataToSave = { ...formData };
+
+    if (initialComments !== formData.comments) {
+      // Comment was changed or added
+      formDataToSave.newCommentsAdded = true;
+    } else if (formData.newCommentsAdded) {
+      // Comment was not changed, but newCommentsAdded is true
+      // Reset newCommentsAdded to false
+      formDataToSave.newCommentsAdded = false;
+    }
+
     if (onSave) {
-      onSave({ ...appointment, details: formData });
+      onSave({
+        ...appointment,
+        details: formDataToSave,
+      });
     }
   };
 
@@ -238,7 +280,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   const handleRescheduleSubmit = () => {
     // Format the date to match the original format
     const formattedDate = new Date(newDate).toDateString(); // Converts to "Wed Sep 25 2024"
-  
+
     // Create the updated appointment with the new date
     const updatedAppointment = {
       ...appointment,
@@ -246,12 +288,11 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       date: formattedDate, // Use the formatted date
       startTime: newTime,
     };
-  
+
     // Save the updated appointment
     onSave(updatedAppointment);
     setIsRescheduleModalOpen(false);
   };
-  
 
   useEffect(() => {
     handleModalOpen();
@@ -267,7 +308,6 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
           <div className="icon-group">
             <ReactToPrint
               trigger={() => {
-                console.log('Print button clicked');
                 return <FaPrint className="print-icon" title="Print Job Card" />;
               }}
               content={() => componentRef.current}
@@ -392,7 +432,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
               <textarea
                 name="comments"
                 value={formData.comments}
-                onChange={(e) => setFormData((prev) => ({ ...prev, comments: e.target.value }))}
+                onChange={handleChange}
                 placeholder="Add any additional notes here..."
               />
             </div>
