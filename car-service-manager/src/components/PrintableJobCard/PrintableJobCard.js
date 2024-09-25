@@ -6,6 +6,9 @@ const PrintableJobCard = forwardRef(({ appointment }, ref) => {
   const tasks = details.tasks || [];
   const comments = details.comments || ''; // Retrieve the comments
 
+   // Split comments by new line characters
+   const formattedComments = comments.split('\n');
+
   return (
     <div ref={ref} className="job-card">
       <h1>Job Card</h1>
@@ -26,7 +29,11 @@ const PrintableJobCard = forwardRef(({ appointment }, ref) => {
       {comments && (
         <div className="comments-section">
           <h3>Comments</h3>
-          <p>{comments}</p>
+          <ul>
+            {formattedComments.map((comment, index) => (
+              <li key={index}>{comment}</li>
+            ))}
+            </ul>
         </div>
       )}
     </div>
