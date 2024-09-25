@@ -236,17 +236,22 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   };
 
   const handleRescheduleSubmit = () => {
-    // Reschedule the appointment
+    // Format the date to match the original format
+    const formattedDate = new Date(newDate).toDateString(); // Converts to "Wed Sep 25 2024"
+  
+    // Create the updated appointment with the new date
     const updatedAppointment = {
       ...appointment,
       tech: newTechnician,
-      date: newDate,
+      date: formattedDate, // Use the formatted date
       startTime: newTime,
     };
-
+  
+    // Save the updated appointment
     onSave(updatedAppointment);
     setIsRescheduleModalOpen(false);
   };
+  
 
   useEffect(() => {
     handleModalOpen();
