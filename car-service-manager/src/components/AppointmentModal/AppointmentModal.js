@@ -51,6 +51,7 @@ const initialFormData = {
 };
 
 function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, startTime }) {
+  
   const [formData, setFormData] = useState(initialFormData);
   const [newTask, setNewTask] = useState('');
   const [userRole, setUserRole] = useState('');
@@ -68,11 +69,30 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     const storedUsername = sessionStorage.getItem('username');
     setUserRole(role);
     setUsername(storedUsername);
-
+  
     if (appointment.details) {
       // Merge initialFormData with appointment.details to ensure all fields are present
-      setFormData({ ...initialFormData, ...appointment.details });
-      console.log('Loaded appointment details:', appointment.details);
+      const details = appointment.details;
+  
+      // Convert any Timestamp fields to Date objects
+      const convertedDetails = { ...details };
+  
+      const dateFields = ['startTime', 'resumeTime', 'pausedTime']; // List all date fields
+  
+      dateFields.forEach(field => {
+        if (details[field]) {
+          if (details[field].toDate) {
+            // If it's a Timestamp object, convert it to Date
+            convertedDetails[field] = details[field].toDate();
+          } else if (typeof details[field] === 'string' || typeof details[field] === 'number') {
+            // If it's a string or number, convert it to Date
+            convertedDetails[field] = new Date(details[field]);
+          }
+        }
+      });
+  
+      setFormData({ ...initialFormData, ...convertedDetails });
+      console.log('Loaded appointment details with converted dates:', convertedDetails);
       setInitialComments(appointment.details.comments || '');
     } else {
       // New appointment
@@ -80,6 +100,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       setInitialComments('');
     }
   }, [appointment]);
+  
 
   const handleChange = async (e) => {
     const { name, value, type, checked } = e.target;
@@ -149,22 +170,33 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       const updatedTasks = [...prev.tasks];
       const currentTask = updatedTasks[index];
       const technician = username; // Assuming username is the current technician
-
+  
       const currentTime = new Date();
       let timeSpent = 0;
-
-      if (prev.resumeTime) {
-        // Calculate time spent since last resume
-        timeSpent = Math.floor((currentTime - new Date(prev.resumeTime)) / 60000);
-      } else if (prev.startTime) {
-        // If the task is the first one, calculate from startTime
-        timeSpent = Math.floor((currentTime - new Date(prev.startTime)) / 60000);
+  
+      let resumeTime = prev.resumeTime;
+      let startTime = prev.startTime;
+  
+      if (resumeTime && !(resumeTime instanceof Date)) {
+        resumeTime = new Date(resumeTime);
       }
-
+  
+      if (startTime && !(startTime instanceof Date)) {
+        startTime = new Date(startTime);
+      }
+  
+      if (resumeTime) {
+        // Calculate time spent since last resume
+        timeSpent = Math.floor((currentTime - resumeTime) / 60000);
+      } else if (startTime) {
+        // If the task is the first one, calculate from startTime
+        timeSpent = Math.floor((currentTime - startTime) / 60000);
+      }
+  
       currentTask.completed = !currentTask.completed;
       currentTask.completedBy = technician;
       currentTask.timeSpent = timeSpent;
-
+  
       // Update technician's total time
       const updatedTechnicianTimes = { ...prev.technicianTimes };
       if (updatedTechnicianTimes[technician]) {
@@ -172,7 +204,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       } else {
         updatedTechnicianTimes[technician] = timeSpent;
       }
-
+  
       return {
         ...prev,
         tasks: updatedTasks,
@@ -181,6 +213,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       };
     });
   };
+  
 
   const handleCheckIn = () => {
     const startTime = new Date();
