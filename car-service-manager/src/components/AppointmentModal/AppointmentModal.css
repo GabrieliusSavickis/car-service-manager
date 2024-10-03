@@ -269,3 +269,9 @@ form button:hover {
 .time-validation-controls select {
   width: 120px; /* Adjust this value to make the select field wider */
 }
+
+.admin-info p {
+  font-size: 0.8em; /* Adjust the font size as needed */
+  color: #555;      /* Optional: make the text a bit lighter */
+  text-align: left;
+}

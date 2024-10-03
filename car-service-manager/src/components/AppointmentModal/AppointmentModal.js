@@ -48,10 +48,12 @@ const initialFormData = {
   technicianTimes: {}, // Stores the total time spent by each technician
   currentTechnician: null, // Track the currently active technician
   newCommentsAdded: false, // Include this field as well
+  checkInTime: null, // To store the check-in time
+  completionTime: null, // To store the completion time
 };
 
 function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, startTime }) {
-  
+
   const [formData, setFormData] = useState(initialFormData);
   const [newTask, setNewTask] = useState('');
   const [userRole, setUserRole] = useState('');
@@ -71,16 +73,16 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     const storedUsername = sessionStorage.getItem('username');
     setUserRole(role);
     setUsername(storedUsername);
-  
+
     if (appointment.details) {
       // Merge initialFormData with appointment.details to ensure all fields are present
       const details = appointment.details;
-  
+
       // Convert any Timestamp fields to Date objects
       const convertedDetails = { ...details };
-  
-      const dateFields = ['startTime', 'resumeTime', 'pausedTime']; // List all date fields
-  
+
+      const dateFields = ['startTime', 'resumeTime', 'pausedTime', 'checkInTime', 'completionTime']; // List all date fields
+
       dateFields.forEach(field => {
         if (details[field]) {
           if (details[field].toDate) {
@@ -92,7 +94,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
           }
         }
       });
-  
+
       setFormData({ ...initialFormData, ...convertedDetails });
       console.log('Loaded appointment details with converted dates:', convertedDetails);
       setInitialComments(appointment.details.comments || '');
@@ -102,11 +104,11 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       setInitialComments('');
     }
   }, [appointment]);
-  
+
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-  
+
     // Handle checkbox separately
     if (type === 'checkbox') {
       setFormData((prev) => ({
@@ -115,14 +117,14 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       }));
       return;
     }
-  
+
     // Just update the vehicleReg in formData, without performing lookup
     if (name === 'vehicleReg') {
       const updatedValue = value.toUpperCase();
       setFormData((prev) => ({ ...prev, vehicleReg: updatedValue }));
       return;
     }
-  
+
     // For comments, simply update the comments in formData
     if (name === 'comments') {
       setFormData((prev) => ({
@@ -133,7 +135,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
   };
-  
+
 
   const handleExpectedTimeChange = (e) => {
     console.log('Selected time value:', e.target.value);
@@ -155,33 +157,36 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       const updatedTasks = [...prev.tasks];
       const currentTask = updatedTasks[index];
       const technician = username; // Assuming username is the current technician
-  
+
       const currentTime = new Date();
       let timeSpent = 0;
-  
+
       let resumeTime = prev.resumeTime;
       let startTime = prev.startTime;
-  
+
       if (resumeTime && !(resumeTime instanceof Date)) {
         resumeTime = new Date(resumeTime);
       }
-  
+
       if (startTime && !(startTime instanceof Date)) {
         startTime = new Date(startTime);
       }
-  
+
       if (resumeTime) {
         // Calculate time spent since last resume
         timeSpent = Math.floor((currentTime - resumeTime) / 60000);
       } else if (startTime) {
         // If the task is the first one, calculate from startTime
         timeSpent = Math.floor((currentTime - startTime) / 60000);
+      } else {
+        console.warn('No startTime or resumeTime set. Cannot calculate timeSpent.');
+        timeSpent = 0; // Handle this case as needed
       }
-  
+
       currentTask.completed = !currentTask.completed;
       currentTask.completedBy = technician;
       currentTask.timeSpent = timeSpent;
-  
+
       // Update technician's total time
       const updatedTechnicianTimes = { ...prev.technicianTimes };
       if (updatedTechnicianTimes[technician]) {
@@ -189,27 +194,40 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       } else {
         updatedTechnicianTimes[technician] = timeSpent;
       }
-  
+
+      // Check if all tasks are completed
+      const allTasksCompleted = updatedTasks.every((task) => task.completed);
+
+      // Set the completion time if all tasks are completed and it hasn't been set yet
+      let completionTime = prev.completionTime;
+      if (allTasksCompleted && !completionTime) {
+        completionTime = currentTime;
+      }
+
       return {
         ...prev,
         tasks: updatedTasks,
-        resumeTime: currentTask.completed ? currentTime : null, // Reset resumeTime
+        resumeTime: currentTask.completed ? currentTime : null,
         technicianTimes: updatedTechnicianTimes,
+        completionTime, // Update the completionTime
       };
     });
   };
-  
+
+
 
   const handleCheckIn = () => {
-    const startTime = new Date();
+    const currentTime = new Date();
     setFormData((prev) => ({
       ...prev,
       inProgress: true,
-      startTime,
+      startTime: currentTime,
+      checkInTime: currentTime, // Record the actual check-in time
       currentTechnician: username, // Track which technician checked in
     }));
     onCheckIn(appointment.id);
   };
+
 
   const handlePause = () => {
     const pauseTime = new Date();
@@ -315,13 +333,13 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   const handleVehicleRegKeyDown = async (e) => {
     if (e.key === 'Enter') {
       e.preventDefault(); // Prevent the default action (form submission)
-  
+
       const updatedValue = formData.vehicleReg.trim().toUpperCase();
       if (updatedValue !== '') {
         const accountsCollection = collection(firestore, 'accounts');
         const q = query(accountsCollection, where('vehicleReg', '==', updatedValue));
         const querySnapshot = await getDocs(q);
-  
+
         if (!querySnapshot.empty) {
           const accountData = querySnapshot.docs[0].data(); // Assuming vehicleReg is unique
           setFormData((prev) => ({
@@ -345,7 +363,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       }
     }
   };
-  
+
 
   useEffect(() => {
     handleModalOpen();
@@ -378,6 +396,18 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
         </div>
 
         <form onSubmit={handleSubmit} className="appointment-form">
+          {/* Display check-in and completion times for admins under the header and above the Vehicle Reg field */}
+          {userRole === 'admin' && (
+            <div className="admin-info">
+              {formData.checkInTime && (
+                <p>Checked in at: {formData.checkInTime.toLocaleString()}</p>
+              )}
+              {formData.completionTime && (
+                <p>Completed at: {formData.completionTime.toLocaleString()}</p>
+              )}
+            </div>
+          )}
+
           <div className="left-section">
             <label>
               Vehicle Reg:
