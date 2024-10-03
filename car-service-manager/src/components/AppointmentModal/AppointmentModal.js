@@ -61,6 +61,8 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   const [newDate, setNewDate] = useState('');
   const [newTime, setNewTime] = useState('');
   const [initialComments, setInitialComments] = useState('');
+  const [vehicleRegLookupStatus, setVehicleRegLookupStatus] = useState('');
+
 
   const componentRef = useRef(); // Reference to the PrintableJobCard component
 
@@ -102,9 +104,9 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   }, [appointment]);
   
 
-  const handleChange = async (e) => {
+  const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-
+  
     // Handle checkbox separately
     if (type === 'checkbox') {
       setFormData((prev) => ({
@@ -113,32 +115,14 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       }));
       return;
     }
-
-    // Handle vehicleReg changes asynchronously
+  
+    // Just update the vehicleReg in formData, without performing lookup
     if (name === 'vehicleReg') {
       const updatedValue = value.toUpperCase();
-      let updatedData = { [name]: updatedValue };
-
-      if (updatedValue.trim() !== '') {
-        const accountsCollection = collection(firestore, 'accounts');
-        const q = query(accountsCollection, where('vehicleReg', '==', updatedValue));
-        const querySnapshot = await getDocs(q);
-
-        if (!querySnapshot.empty) {
-          const accountData = querySnapshot.docs[0].data(); // Assuming vehicleReg is unique
-          updatedData = {
-            ...updatedData,
-            vehicleMake: accountData.vehicleMake || '',
-            customerName: accountData.customerName || '',
-            customerPhone: accountData.customerPhone || '',
-          };
-        }
-      }
-
-      setFormData((prev) => ({ ...prev, ...updatedData }));
+      setFormData((prev) => ({ ...prev, vehicleReg: updatedValue }));
       return;
     }
-
+  
     // For comments, simply update the comments in formData
     if (name === 'comments') {
       setFormData((prev) => ({
@@ -149,6 +133,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
   };
+  
 
   const handleExpectedTimeChange = (e) => {
     console.log('Selected time value:', e.target.value);
@@ -327,6 +312,41 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     setIsRescheduleModalOpen(false);
   };
 
+  const handleVehicleRegKeyDown = async (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault(); // Prevent the default action (form submission)
+  
+      const updatedValue = formData.vehicleReg.trim().toUpperCase();
+      if (updatedValue !== '') {
+        const accountsCollection = collection(firestore, 'accounts');
+        const q = query(accountsCollection, where('vehicleReg', '==', updatedValue));
+        const querySnapshot = await getDocs(q);
+  
+        if (!querySnapshot.empty) {
+          const accountData = querySnapshot.docs[0].data(); // Assuming vehicleReg is unique
+          setFormData((prev) => ({
+            ...prev,
+            vehicleMake: accountData.vehicleMake || '',
+            customerName: accountData.customerName || '',
+            customerPhone: accountData.customerPhone || '',
+          }));
+          setVehicleRegLookupStatus('Vehicle details loaded.');
+        } else {
+          // If no match is found, you may choose to clear the other fields or leave them as is
+          // For example, you could reset the form fields related to account details:
+          setFormData((prev) => ({
+            ...prev,
+            vehicleMake: '',
+            customerName: '',
+            customerPhone: '',
+          }));
+          setVehicleRegLookupStatus('No matching vehicle found.');
+        }
+      }
+    }
+  };
+  
+
   useEffect(() => {
     handleModalOpen();
   }, []);
@@ -366,9 +386,11 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
                 name="vehicleReg"
                 value={formData.vehicleReg}
                 onChange={handleChange}
+                onKeyDown={handleVehicleRegKeyDown}
                 required
               />
             </label>
+            {vehicleRegLookupStatus && <p>{vehicleRegLookupStatus}</p>}
             <label>
               Vehicle Make:
               <input
