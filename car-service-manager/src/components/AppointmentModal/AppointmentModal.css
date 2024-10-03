@@ -9,6 +9,7 @@
   height: 100%;
   background-color: rgba(0, 0, 0, 0.5);
   z-index: 1000;
+  overflow-y: auto;
 }
 
 .modal-content {
@@ -17,6 +18,9 @@
   border-radius: 5px;
   width: 500px; /* Increased width to accommodate the new layout */
   position: relative;
+
+  max-height: 80vh; /* Maximum height is 80% of the viewport height */
+  overflow-y: auto; /* Enable vertical scrolling if content exceeds max-height */
 }
 
 .close {
