@@ -217,7 +217,6 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
         completionTime,
         inProgress,
         startTime,
-        resumeTime,
         pausedTime,
       };
     });
