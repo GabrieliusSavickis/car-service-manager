@@ -148,6 +148,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       ...prev,
       tasks: [...prev.tasks, { text: newTask, completed: false, completedBy: null }],
       newTasksAdded: prev.inProgress ? true : false,
+      completionTime: null, // Reset completionTime when new tasks are added
     }));
     setNewTask('');
   };
@@ -156,13 +157,14 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     setFormData((prev) => {
       const updatedTasks = [...prev.tasks];
       const currentTask = updatedTasks[index];
-      const technician = username; // Assuming username is the current technician
+      const technician = username;
 
       const currentTime = new Date();
       let timeSpent = 0;
 
       let resumeTime = prev.resumeTime;
       let startTime = prev.startTime;
+      let pausedTime = prev.pausedTime;
 
       if (resumeTime && !(resumeTime instanceof Date)) {
         resumeTime = new Date(resumeTime);
@@ -173,21 +175,18 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       }
 
       if (resumeTime) {
-        // Calculate time spent since last resume
         timeSpent = Math.floor((currentTime - resumeTime) / 60000);
       } else if (startTime) {
-        // If the task is the first one, calculate from startTime
         timeSpent = Math.floor((currentTime - startTime) / 60000);
       } else {
         console.warn('No startTime or resumeTime set. Cannot calculate timeSpent.');
-        timeSpent = 0; // Handle this case as needed
+        timeSpent = 0;
       }
 
       currentTask.completed = !currentTask.completed;
       currentTask.completedBy = technician;
       currentTask.timeSpent = timeSpent;
 
-      // Update technician's total time
       const updatedTechnicianTimes = { ...prev.technicianTimes };
       if (updatedTechnicianTimes[technician]) {
         updatedTechnicianTimes[technician] += timeSpent;
@@ -198,21 +197,32 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       // Check if all tasks are completed
       const allTasksCompleted = updatedTasks.every((task) => task.completed);
 
-      // Set the completion time if all tasks are completed and it hasn't been set yet
       let completionTime = prev.completionTime;
+      let inProgress = prev.inProgress;
+
       if (allTasksCompleted && !completionTime) {
         completionTime = currentTime;
+        inProgress = false; // Set inProgress to false when all tasks are completed
+        // Reset timers
+        startTime = null;
+        resumeTime = null;
+        pausedTime = null;
       }
 
       return {
         ...prev,
         tasks: updatedTasks,
-        resumeTime: currentTask.completed ? currentTime : null,
+        resumeTime: currentTask.completed ? null : currentTime,
         technicianTimes: updatedTechnicianTimes,
-        completionTime, // Update the completionTime
+        completionTime,
+        inProgress,
+        startTime,
+        resumeTime,
+        pausedTime,
       };
     });
   };
+
 
 
 
@@ -221,12 +231,14 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     setFormData((prev) => ({
       ...prev,
       inProgress: true,
-      startTime: currentTime,
-      checkInTime: currentTime, // Record the actual check-in time
-      currentTechnician: username, // Track which technician checked in
+      startTime: prev.startTime || currentTime, // Keep original startTime if it exists
+      resumeTime: currentTime, // Set resumeTime to current time
+      checkInTime: prev.checkInTime || currentTime, // Keep original check-in time
+      currentTechnician: username,
     }));
     onCheckIn(appointment.id);
   };
+
 
 
   const handlePause = () => {
@@ -247,6 +259,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
         isPaused: true,
         pausedTime: pauseTime,
         technicianTimes: updatedTechnicianTimes,
+        resumeTime: null, // Reset resumeTime when paused
       };
     });
   };
@@ -543,6 +556,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
               Save Appointment
             </button>
           </div>
+
 
           {/* Only show the delete button if the user is an admin */}
           {userRole === 'admin' && appointment.id && (
