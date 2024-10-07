@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import './AppointmentModal.css';
 import { FaCircle, FaCheckCircle, FaPrint, FaExchangeAlt } from 'react-icons/fa';
 import { firestore } from '../../firebase';
-import { collection, query, where, getDocs, updateDoc} from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import PrintableJobCard from '../PrintableJobCard/PrintableJobCard';
 import ReactToPrint from 'react-to-print';
 
@@ -69,6 +69,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
 
 
   const componentRef = useRef(); // Reference to the PrintableJobCard component
+  const taskInputRef = useRef(null);
 
   useEffect(() => {
     const role = sessionStorage.getItem('userRole');
@@ -294,42 +295,42 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-  
+
     let formDataToSave = { ...formData };
-  
+
     if (initialComments !== formData.comments) {
       formDataToSave.newCommentsAdded = true;
     } else if (formData.newCommentsAdded) {
       formDataToSave.newCommentsAdded = false;
     }
-  
+
     if (onSave) {
       onSave({
         ...appointment,
         details: formDataToSave,
       });
     }
-  
+
     // Save updated mileage to the vehicle's account
     if (formData.vehicleReg && formData.mileage) {
       const accountsCollection = collection(firestore, 'accounts');
       const q = query(accountsCollection, where('vehicleReg', '==', formData.vehicleReg));
       const querySnapshot = await getDocs(q);
-  
+
       if (!querySnapshot.empty) {
         const docRef = querySnapshot.docs[0].ref;
         await updateDoc(docRef, { mileage: formData.mileage });
       }
-        // Optionally, create a new account if it doesn't exist
-        // await addDoc(accountsCollection, {
-        //   vehicleReg: formData.vehicleReg,
-        //   mileage: formData.mileage,
-        //   // Add other fields as needed
-        // });
-      
+      // Optionally, create a new account if it doesn't exist
+      // await addDoc(accountsCollection, {
+      //   vehicleReg: formData.vehicleReg,
+      //   mileage: formData.mileage,
+      //   // Add other fields as needed
+      // });
+
     }
   };
-  
+
 
   const handleModalOpen = () => {
     setFormData((prev) => ({
@@ -412,7 +413,18 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     }));
   };
 
-
+  const handleTaskInputKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault(); // Prevent form submission
+      handleAddTask(); // Call the function to add the task
+  
+      // Refocus the input field
+      if (taskInputRef.current) {
+        taskInputRef.current.focus();
+      }
+    }
+  };
+  
 
 
   useEffect(() => {
@@ -566,6 +578,8 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
                   value={newTask}
                   onChange={(e) => setNewTask(e.target.value)}
                   placeholder="Add a new task"
+                  ref={taskInputRef} // Add this
+                  onKeyDown={handleTaskInputKeyDown} // Add this
                 />
                 <button type="button" onClick={handleAddTask}>Add Task</button>
               </div>
