@@ -57,11 +57,12 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   overflow: hidden;
   z-index: 1;
   box-sizing: border-box;
   transition: background-color 0.3s ease; /* Smooth transition for color changes */
+  font-size: 0.9em;
 }
 
 /* New styles for lunch break */
@@ -73,7 +74,7 @@
   align-items: center;
   height: 38px; /* Adjust height if needed */
   font-weight: bold;
-  /* z-index: 10; /* This makes the lunch break divider appear on top */
+  z-index: 10; /* This makes the lunch break divider appear on top */
   color: #555;
 }
 
