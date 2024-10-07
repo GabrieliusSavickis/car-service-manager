@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import './AppointmentModal.css';
 import { FaCircle, FaCheckCircle, FaPrint, FaExchangeAlt } from 'react-icons/fa';
 import { firestore } from '../../firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc} from 'firebase/firestore';
 import PrintableJobCard from '../PrintableJobCard/PrintableJobCard';
 import ReactToPrint from 'react-to-print';
 
@@ -50,6 +50,8 @@ const initialFormData = {
   newCommentsAdded: false, // Include this field as well
   checkInTime: null, // To store the check-in time
   completionTime: null, // To store the completion time
+  mileage: '', // New field for Mileage
+  mileageUpdated: false, // Flag to track if mileage has been updated
 };
 
 function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, startTime }) {
@@ -136,7 +138,6 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     }
   };
 
-
   const handleExpectedTimeChange = (e) => {
     console.log('Selected time value:', e.target.value);
     setFormData((prev) => ({ ...prev, expectedTime: parseInt(e.target.value) }));
@@ -166,6 +167,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       let startTime = prev.startTime;
       let pausedTime = prev.pausedTime;
 
+      // Convert to Date objects if necessary
       if (resumeTime && !(resumeTime instanceof Date)) {
         resumeTime = new Date(resumeTime);
       }
@@ -174,6 +176,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
         startTime = new Date(startTime);
       }
 
+      // Calculate time spent
       if (resumeTime) {
         timeSpent = Math.floor((currentTime - resumeTime) / 60000);
       } else if (startTime) {
@@ -183,10 +186,21 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
         timeSpent = 0;
       }
 
+      // Check if this is the last incomplete task
+      const incompleteTasks = updatedTasks.filter((task) => !task.completed);
+      const isLastTask = incompleteTasks.length === 1 && !currentTask.completed;
+
+      // If it's the last task and mileage hasn't been updated, prevent completion
+      if (isLastTask && (!prev.mileage || !prev.mileageUpdated)) {
+        alert('Please update the Mileage before completing the last task.');
+        return prev; // Do not update the state
+      }
+
       currentTask.completed = !currentTask.completed;
       currentTask.completedBy = technician;
       currentTask.timeSpent = timeSpent;
 
+      // Update technician's total time
       const updatedTechnicianTimes = { ...prev.technicianTimes };
       if (updatedTechnicianTimes[technician]) {
         updatedTechnicianTimes[technician] += timeSpent;
@@ -221,9 +235,6 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       };
     });
   };
-
-
-
 
   const handleCheckIn = () => {
     const currentTime = new Date();
@@ -281,29 +292,44 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-
-    console.log("Submitting form. formData.newCommentsAdded:", formData.newCommentsAdded);
-
+  
     let formDataToSave = { ...formData };
-
+  
     if (initialComments !== formData.comments) {
-      // Comment was changed or added
       formDataToSave.newCommentsAdded = true;
     } else if (formData.newCommentsAdded) {
-      // Comment was not changed, but newCommentsAdded is true
-      // Reset newCommentsAdded to false
       formDataToSave.newCommentsAdded = false;
     }
-
+  
     if (onSave) {
       onSave({
         ...appointment,
         details: formDataToSave,
       });
     }
+  
+    // Save updated mileage to the vehicle's account
+    if (formData.vehicleReg && formData.mileage) {
+      const accountsCollection = collection(firestore, 'accounts');
+      const q = query(accountsCollection, where('vehicleReg', '==', formData.vehicleReg));
+      const querySnapshot = await getDocs(q);
+  
+      if (!querySnapshot.empty) {
+        const docRef = querySnapshot.docs[0].ref;
+        await updateDoc(docRef, { mileage: formData.mileage });
+      }
+        // Optionally, create a new account if it doesn't exist
+        // await addDoc(accountsCollection, {
+        //   vehicleReg: formData.vehicleReg,
+        //   mileage: formData.mileage,
+        //   // Add other fields as needed
+        // });
+      
+    }
   };
+  
 
   const handleModalOpen = () => {
     setFormData((prev) => ({
@@ -359,22 +385,34 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
             vehicleMake: accountData.vehicleMake || '',
             customerName: accountData.customerName || '',
             customerPhone: accountData.customerPhone || '',
+            mileage: accountData.mileage || '', // Populate mileage
           }));
           setVehicleRegLookupStatus('Vehicle details loaded.');
         } else {
-          // If no match is found, you may choose to clear the other fields or leave them as is
-          // For example, you could reset the form fields related to account details:
+          // If no match is found, clear the account detail fields
           setFormData((prev) => ({
             ...prev,
             vehicleMake: '',
             customerName: '',
             customerPhone: '',
+            mileage: '', // Clear mileage
           }));
           setVehicleRegLookupStatus('No matching vehicle found.');
         }
       }
     }
   };
+
+  const handleMileageChange = (e) => {
+    const { value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      mileage: value,
+      mileageUpdated: true, // Set to true when the mileage is updated
+    }));
+  };
+
+
 
 
   useEffect(() => {
@@ -440,6 +478,15 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
                 name="vehicleMake"
                 value={formData.vehicleMake}
                 onChange={handleChange}
+              />
+            </label>
+            <label>
+              Mileage:
+              <input
+                type="text"
+                name="mileage"
+                value={formData.mileage}
+                onChange={handleMileageChange}
               />
             </label>
             <label>
