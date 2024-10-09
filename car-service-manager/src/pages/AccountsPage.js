@@ -54,16 +54,27 @@ const AccountsPage = () => {
     const querySnapshot = await getDocs(q);
     const appointmentsList = querySnapshot.docs.map(doc => {
       const appointment = doc.data();
+      // Combine date and startTime
+      const date = appointment.date; // Assuming this is a string like "Wed Sep 25 2024"
+      const time = appointment.startTime || appointment.details.startTime; // Get startTime from appointment
+      // Create a Date object from the date and time
+      const dateTimeString = `${date} ${time}`;
+      const dateTime = new Date(dateTimeString);
+      // Format the date and time
+      const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+      const formattedDateTime = dateTime.toLocaleString('en-US', options);
+
       return {
         id: doc.id,
         ...appointment,
-        formattedDate: appointment.date // Use the date field directly
+        formattedDateTime,
       };
     });
 
     setSelectedAccount(vehicleReg);
     setServiceHistory(appointmentsList);
   };
+
 
 
   return (
@@ -129,15 +140,23 @@ const AccountsPage = () => {
                 {serviceHistory.length > 0 ? (
                   serviceHistory.map(appointment => (
                     <li key={appointment.id}>
-                      <strong>Date:</strong> {appointment.formattedDate} <br />
-                      <strong>Description: </strong>
-                      <span className="description-preview">
-                        {appointment.details.tasks && appointment.details.tasks.length > 0
-                          ? appointment.details.tasks.map(task => task.text).join(', ')
-                          : 'No tasks available'}
-                      </span>
+                      <strong>Date:</strong> {appointment.formattedDateTime} <br />
+                      <strong>Technician:</strong> {appointment.tech} <br />
+                      <strong>Tasks:</strong>
+                      <ul>
+                        {appointment.details.tasks && appointment.details.tasks.length > 0 ? (
+                          appointment.details.tasks.map((task, index) => (
+                            <li key={index}>
+                              {task.text} - {task.completed ? 'Completed' : 'Not Completed'}
+                            </li>
+                          ))
+                        ) : (
+                          <li>No tasks available</li>
+                        )}
+                      </ul>
+
+                      <strong>Comments: </strong> {appointment.details.comments || 'No comments available'}
                       <br />
-                      <strong>Technician:</strong> {appointment.tech}
                     </li>
                   ))
                 ) : (
