@@ -70,18 +70,22 @@
     left: 50%;
     transform: translate(-50%, -50%);
     width: 500px;
-    background-color: white;
+    background-color: #fafafa;
     padding: 20px;
     box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
     z-index: 1000;
     border-radius: 10px;
     max-height: 70vh; /* Prevent modal from growing too tall */
-    overflow: hidden;
+    overflow: auto;
     display: flex;
     flex-direction: column;
+    
   }
+
+  
   
   .service-history-modal h2 {
+    font-size: 24px;
     text-align: center;
     margin-bottom: 20px;
   }
@@ -139,4 +143,40 @@
     background-color: rgba(0, 0, 0, 0.5);
     z-index: 999;
   }
+
+  .appointment-entry {
+    border-bottom: 1px solid #ddd;
+    padding: 10px;
+    cursor: pointer;
+  }
+  
+  .appointment-summary {
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* Add this */
+    cursor: pointer;
+  }
+
+  .appointment-summary .toggle-icon {
+    margin-left: 10px;
+    font-size: 1.2em; /* Adjust size as needed */
+  }
+
+  .appointment-summary:hover {
+    background-color: #f9f9f9;
+  }
+  
+  .appointment-details {
+    padding: 10px 0;
+    font-size: 16px;
+    
+  }
+
+  body {
+  font-family: 'Roboto', sans-serif;
+  font-size: 16px;
+  color: #333;
+}
+  
   

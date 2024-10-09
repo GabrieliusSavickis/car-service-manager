@@ -4,6 +4,9 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import Header from '../components/Header/Header';
 import './AccountsPage.css';
 import { useNavigate } from 'react-router-dom';
+import { FaCheckCircle, FaTimesCircle, FaChevronDown, FaChevronUp } from 'react-icons/fa';
+
+import { Collapse } from 'react-collapse';
 
 const AccountsPage = () => {
   const [accounts, setAccounts] = useState([]);
@@ -61,21 +64,28 @@ const AccountsPage = () => {
       const dateTimeString = `${date} ${time}`;
       const dateTime = new Date(dateTimeString);
       // Format the date and time
-      const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+      const options = {
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false, // Use 24-hour format
+      };
       const formattedDateTime = dateTime.toLocaleString('en-US', options);
 
       return {
         id: doc.id,
         ...appointment,
         formattedDateTime,
+        isOpen: false, // Add isOpen property
       };
     });
 
     setSelectedAccount(vehicleReg);
     setServiceHistory(appointmentsList);
   };
-
-
 
   return (
     <div className="accounts-page">
@@ -136,34 +146,55 @@ const AccountsPage = () => {
           <div className="service-history-modal">
             <h2>Service History for {selectedAccount}</h2>
             <div className="service-history-list">
-              <ul>
-                {serviceHistory.length > 0 ? (
-                  serviceHistory.map(appointment => (
-                    <li key={appointment.id}>
-                      <strong>Date:</strong> {appointment.formattedDateTime} <br />
-                      <strong>Technician:</strong> {appointment.tech} <br />
-                      <strong>Tasks:</strong>
-                      <ul>
-                        {appointment.details.tasks && appointment.details.tasks.length > 0 ? (
-                          appointment.details.tasks.map((task, index) => (
-                            <li key={index}>
-                              {task.text} - {task.completed ? 'Completed' : 'Not Completed'}
-                            </li>
-                          ))
-                        ) : (
-                          <li>No tasks available</li>
-                        )}
-                      </ul>
-
-                      <strong>Comments: </strong> {appointment.details.comments || 'No comments available'}
-                      <br />
-                    </li>
-                  ))
-                ) : (
-                  <p>No service history available for this vehicle.</p>
-                )}
-
-              </ul>
+              {serviceHistory.length > 0 ? (
+                serviceHistory.map(appointment => (
+                  <div key={appointment.id} className="appointment-entry">
+                    <div
+                      className="appointment-summary"
+                      onClick={() =>
+                        setServiceHistory(prev =>
+                          prev.map(app =>
+                            app.id === appointment.id
+                              ? { ...app, isOpen: !app.isOpen }
+                              : app
+                          )
+                        )
+                      }
+                    >
+                      <strong>Date:</strong> {appointment.formattedDateTime}
+                      <span className="toggle-icon">
+                        {appointment.isOpen ? <FaChevronUp /> : <FaChevronDown />}
+                      </span>
+                    </div>
+                    <Collapse isOpened={appointment.isOpen}>
+                      <div className="appointment-details">
+                        <strong>Technician:</strong> {appointment.tech} <br />
+                        <strong>Tasks:</strong>
+                        <ul>
+                          {appointment.details.tasks && appointment.details.tasks.length > 0 ? (
+                            appointment.details.tasks.map((task, index) => (
+                              <li key={index}>
+                                {task.completed ? (
+                                  <FaCheckCircle color="green" />
+                                ) : (
+                                  <FaTimesCircle color="red" />
+                                )}
+                                {' '}
+                                {task.text}
+                              </li>
+                            ))
+                          ) : (
+                            <li>No tasks available</li>
+                          )}
+                        </ul>
+                        <strong>Comments: </strong> {appointment.details.comments || 'No comments available'}
+                      </div>
+                    </Collapse>
+                  </div>
+                ))
+              ) : (
+                <p>No service history available for this vehicle.</p>
+              )}
             </div>
             <button onClick={() => setSelectedAccount(null)}>Close</button>
           </div>
