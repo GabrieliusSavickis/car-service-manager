@@ -70,6 +70,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
 
   const componentRef = useRef(); // Reference to the PrintableJobCard component
   const taskInputRef = useRef(null);
+  const displayTime = appointment.id ? appointment.startTime : startTime;
 
   useEffect(() => {
     const role = sessionStorage.getItem('userRole');
@@ -437,7 +438,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
         <span className="close" onClick={onClose}>&times;</span>
         <div className="modal-header">
           {!appointment.id && <h2>New Appointment at {startTime}</h2>}
-          {appointment.id && <h2>Edit Appointment</h2>}
+          {appointment.id && <h2>Edit Appointment at {displayTime}</h2>}
           <div className="icon-group">
             <ReactToPrint
               trigger={() => {
