@@ -1,5 +1,16 @@
 {
   "projects": {
     "default": "carservicemanager-54f05"
-  }
+  },
+  "targets": {
+    "carservicemanager-54f05": {
+      "hosting": {
+        "asgennislive": [
+          "asgennislive"
+        ]
+      }
+    }
+  },
+  "etags": {},
+  "dataconnectEmulatorConfig": {}
 }
