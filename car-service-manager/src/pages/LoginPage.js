@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { auth, signInWithEmailAndPasswordFunction } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 import { firestore } from '../firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc } from 'firebase/firestore';
 import './LoginPage.css';
 
 function LoginPage() {
@@ -15,30 +15,30 @@ function LoginPage() {
     e.preventDefault();
     try {
       let email = loginInput;
-
+  
       // Check if the input is a username and fetch the associated email
       if (!loginInput.includes('@')) {
-        const q = query(collection(firestore, 'users'), where('username', '==', loginInput));
-        const querySnapshot = await getDocs(q);
-
-        if (!querySnapshot.empty) {
-          // Get the email associated with the username
-          const userData = querySnapshot.docs[0].data();
+        // Fetch the user document directly using the username as the document ID
+        const userDocRef = doc(firestore, 'users', loginInput);
+        const userDocSnap = await getDoc(userDocRef);
+  
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
           email = userData.email;
         } else {
           throw new Error('Username not found.');
         }
       }
-
+  
       // Use the email for login
       await signInWithEmailAndPasswordFunction(auth, email, password);
-
+  
       // Fetch the role after login
       const role = await fetchUserRole(email);
-
-      // You can store the role in session storage or context/state management for future use
-      sessionStorage.setItem('userRole', role); // Store the user's role
-
+  
+      // Store the user's role
+      sessionStorage.setItem('userRole', role);
+  
       setError('');
       navigate('/appointments');
     } catch (error) {
