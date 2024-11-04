@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { auth, signInWithEmailAndPasswordFunction } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 import { firestore } from '../firebase';
-import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import './LoginPage.css';
 
 function LoginPage() {
@@ -15,30 +15,34 @@ function LoginPage() {
     e.preventDefault();
     try {
       let email = loginInput;
-  
+
       // Check if the input is a username and fetch the associated email
       if (!loginInput.includes('@')) {
-        // Fetch the user document directly using the username as the document ID
-        const userDocRef = doc(firestore, 'users', loginInput);
-        const userDocSnap = await getDoc(userDocRef);
-  
-        if (userDocSnap.exists()) {
-          const userData = userDocSnap.data();
+        // Query the 'users' collection for the username
+        const q = query(
+          collection(firestore, 'users'),
+          where('username', '==', loginInput)
+        );
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+          // Get the email associated with the username
+          const userData = querySnapshot.docs[0].data();
           email = userData.email;
         } else {
           throw new Error('Username not found.');
         }
       }
-  
+
       // Use the email for login
       await signInWithEmailAndPasswordFunction(auth, email, password);
-  
-      // Fetch the role after login
+
+      // Fetch the role after login (now that the user is authenticated)
       const role = await fetchUserRole(email);
-  
+
       // Store the user's role
       sessionStorage.setItem('userRole', role);
-  
+
       setError('');
       navigate('/appointments');
     } catch (error) {
@@ -47,7 +51,15 @@ function LoginPage() {
   };
 
   const fetchUserRole = async (email) => {
-    const q = query(collection(firestore, 'users'), where('email', '==', email));
+    // Ensure the user is authenticated before accessing Firestore
+    if (!auth.currentUser) {
+      throw new Error('User is not authenticated.');
+    }
+
+    const q = query(
+      collection(firestore, 'users'),
+      where('email', '==', email)
+    );
     const querySnapshot = await getDocs(q);
 
     if (!querySnapshot.empty) {
@@ -83,7 +95,9 @@ function LoginPage() {
             />
           </div>
           {error && <p className="error">{error}</p>}
-          <button type="submit" className="login-button">Log In</button>
+          <button type="submit" className="login-button">
+            Log In
+          </button>
         </form>
       </div>
     </div>
