@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { auth, signInWithEmailAndPasswordFunction } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 import { firestore } from '../firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc } from 'firebase/firestore';
 import './LoginPage.css';
 
 function LoginPage() {
@@ -18,11 +18,7 @@ function LoginPage() {
 
       // Check if the input is a username and fetch the associated email
       if (!loginInput.includes('@')) {
-        // Query the 'users' collection for the username
-        const q = query(
-          collection(firestore, 'users'),
-          where('username', '==', loginInput)
-        );
+        const q = query(collection(firestore, 'users'), where('username', '==', loginInput));
         const querySnapshot = await getDocs(q);
 
         if (!querySnapshot.empty) {
@@ -37,11 +33,11 @@ function LoginPage() {
       // Use the email for login
       await signInWithEmailAndPasswordFunction(auth, email, password);
 
-      // Fetch the role after login (now that the user is authenticated)
+      // Fetch the role after login
       const role = await fetchUserRole(email);
 
-      // Store the user's role
-      sessionStorage.setItem('userRole', role);
+      // You can store the role in session storage or context/state management for future use
+      sessionStorage.setItem('userRole', role); // Store the user's role
 
       setError('');
       navigate('/appointments');
@@ -51,15 +47,7 @@ function LoginPage() {
   };
 
   const fetchUserRole = async (email) => {
-    // Ensure the user is authenticated before accessing Firestore
-    if (!auth.currentUser) {
-      throw new Error('User is not authenticated.');
-    }
-
-    const q = query(
-      collection(firestore, 'users'),
-      where('email', '==', email)
-    );
+    const q = query(collection(firestore, 'users'), where('email', '==', email));
     const querySnapshot = await getDocs(q);
 
     if (!querySnapshot.empty) {
@@ -95,9 +83,7 @@ function LoginPage() {
             />
           </div>
           {error && <p className="error">{error}</p>}
-          <button type="submit" className="login-button">
-            Log In
-          </button>
+          <button type="submit" className="login-button">Log In</button>
         </form>
       </div>
     </div>
