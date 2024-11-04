@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { auth, signInWithEmailAndPasswordFunction } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 import { firestore } from '../firebase';
-import { collection, getDocs, query, where, doc } from 'firebase/firestore';
+import { collection, getDocs, query, where} from 'firebase/firestore';
 import './LoginPage.css';
 
 function LoginPage() {
