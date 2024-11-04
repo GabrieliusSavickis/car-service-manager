@@ -7,6 +7,12 @@
       "hosting": {
         "asgennislive": [
           "asgennislive"
+        ],
+        "asglive": [
+          "asglive"
+        ],
+        "carservicemanager-54f05": [
+          "carservicemanager-54f05"
         ]
       }
     }

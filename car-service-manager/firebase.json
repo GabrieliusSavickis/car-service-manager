@@ -1,7 +1,7 @@
 {
   "hosting": [
     {
-      "target": "asglive",
+      "target": "carservicemanager-54f05",
       "public": "build",
       "ignore": [
         "firebase.json",
