@@ -14,6 +14,19 @@ const TechnicianHoursPage = () => {
   const [technicianHours, setTechnicianHours] = useState([]);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
+  // Determine the domain and set the location suffix
+  const hostname = window.location.hostname;
+  let locationSuffix = '';
+
+  if (hostname.includes('asgennislive.ie')) {
+    locationSuffix = '_ennis'; // Ennis site
+  } else if (hostname.includes('asglive.ie')) {
+    locationSuffix = ''; // Main site
+  }
+
+  // Define the collection name
+  const appointmentsCollectionName = 'appointments' + locationSuffix;
+
   useEffect(() => {
     const fetchTechnicianHours = async () => {
       const startOfDay = new Date(startDate);
@@ -23,7 +36,7 @@ const TechnicianHoursPage = () => {
       endOfDay.setHours(23, 59, 59, 999);
 
       const q = query(
-        collection(firestore, 'appointments'),
+        collection(firestore, appointmentsCollectionName),
         where('date', '>=', startOfDay.toDateString()),
         where('date', '<=', endOfDay.toDateString())
       );
@@ -57,7 +70,7 @@ const TechnicianHoursPage = () => {
     };
 
     fetchTechnicianHours();
-  }, [startDate, endDate]);
+  }, [startDate, endDate, appointmentsCollectionName]); // Add appointmentsCollectionName as a dependency
 
   return (
     <div>
