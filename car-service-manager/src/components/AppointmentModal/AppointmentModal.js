@@ -25,7 +25,7 @@ const timeOptions = [
   { label: '8 hours', value: 16 },
 ];
 
-const technicianOptions = ['Audrius', 'Adomas', 'Igor', 'Vitalik']; // Assuming these are your technician names
+// const technicianOptions = ['Audrius', 'Adomas', 'Igor', 'Vitalik']; // Assuming these are your technician names
 
 // Define initial form data
 const initialFormData = {
@@ -65,6 +65,11 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   } else if (hostname.includes('asglive.ie')) {
     locationSuffix = ''; // Main site
   }
+
+  // Define the technicians array based on the domain
+  const technicianOptions = hostname.includes('asgennislive.ie')
+    ? ['Mechanic 1', 'Mechanic 2', 'Mechanic 3', 'Mechanic 4']
+    : ['Audrius', 'Adomas', 'Igor', 'Vitalik'];
 
   // Define the collection names
   const accountsCollectionName = 'accounts' + locationSuffix;
@@ -431,14 +436,14 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     if (e.key === 'Enter') {
       e.preventDefault(); // Prevent form submission
       handleAddTask(); // Call the function to add the task
-  
+
       // Refocus the input field
       if (taskInputRef.current) {
         taskInputRef.current.focus();
       }
     }
   };
-  
+
 
 
   useEffect(() => {
