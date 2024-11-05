@@ -9,6 +9,21 @@ import { FaCheckCircle, FaTimesCircle, FaChevronDown, FaChevronUp } from 'react-
 import { Collapse } from 'react-collapse';
 
 const AccountsPage = () => {
+  // Determine the domain
+  const hostname = window.location.hostname;
+  let locationSuffix = '';
+
+  if (hostname.includes('asgennislive.ie')) {
+    locationSuffix = '_ennis'; // Ennis site
+  } else if (hostname.includes('asglive.ie')) {
+    locationSuffix = ''; // Main site
+  }
+
+  // Define the collection names
+  const accountsCollectionName = 'accounts' + locationSuffix;
+
+
+
   const [accounts, setAccounts] = useState([]);
   const [searchReg, setSearchReg] = useState('');
   const [filteredAccounts, setFilteredAccounts] = useState([]);
@@ -28,14 +43,14 @@ const AccountsPage = () => {
 
   useEffect(() => {
     const fetchAccounts = async () => {
-      const accountsCollection = collection(firestore, 'accounts');
+      const accountsCollection = collection(firestore, accountsCollectionName);
       const accountsSnapshot = await getDocs(accountsCollection);
       const accountsList = accountsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setAccounts(accountsList);
     };
 
     fetchAccounts();
-  }, []);
+  }, [accountsCollectionName]); // Add accountsCollectionName as a dependency
 
   const handleSearchChange = (e) => {
     const value = e.target.value.toUpperCase();
