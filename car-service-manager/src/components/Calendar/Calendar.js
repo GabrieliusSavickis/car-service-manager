@@ -14,9 +14,9 @@ const timeSlots = [
   '17:00', '17:30',
 ];
 
-const technicians = ['Audrius', 'Adomas', 'Igor', 'Vitalik'];
+// const technicians = ['Audrius', 'Adomas', 'Igor', 'Vitalik'];
 
-const Calendar = ({ appointments, onTimeSlotClick }) => {
+const Calendar = ({ appointments, onTimeSlotClick, technicians }) => {
 
   const calculateAppointmentSpan = (appointment) => {
     const startTimeIndex = timeSlots.indexOf(appointment.startTime);

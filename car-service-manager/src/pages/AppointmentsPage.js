@@ -22,6 +22,11 @@ function AppointmentsPage() {
   const appointmentsCollectionName = 'appointments' + locationSuffix;
   const accountsCollectionName = 'accounts' + locationSuffix;
 
+   // Define the technicians array based on the domain
+   const technicians = hostname.includes('asgennislive.ie')
+   ? ['Mechanic 1', 'Mechanic 2', 'Mechanic 3', 'Mechanic 4']
+   : ['Audrius', 'Adomas', 'Igor', 'Vitalik'];
+
   const [appointments, setAppointments] = useState([]);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -395,6 +400,7 @@ function AppointmentsPage() {
       <Calendar
         appointments={appointments}
         onTimeSlotClick={handleTimeSlotClick}
+        technicians={technicians}
       />
       {isModalOpen && (
         <AppointmentModal
