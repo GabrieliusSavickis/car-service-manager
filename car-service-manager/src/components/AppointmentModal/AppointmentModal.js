@@ -56,6 +56,19 @@ const initialFormData = {
 
 function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, startTime }) {
 
+  // Determine the domain
+  const hostname = window.location.hostname;
+  let locationSuffix = '';
+
+  if (hostname.includes('asgennislive.ie')) {
+    locationSuffix = '_ennis'; // Ennis site
+  } else if (hostname.includes('asglive.ie')) {
+    locationSuffix = ''; // Main site
+  }
+
+  // Define the collection names
+  const accountsCollectionName = 'accounts' + locationSuffix;
+
   const [formData, setFormData] = useState(initialFormData);
   const [newTask, setNewTask] = useState('');
   const [userRole, setUserRole] = useState('');
@@ -314,7 +327,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
 
     // Save updated mileage to the vehicle's account
     if (formData.vehicleReg && formData.mileage) {
-      const accountsCollection = collection(firestore, 'accounts');
+      const accountsCollection = collection(firestore, accountsCollectionName);
       const q = query(accountsCollection, where('vehicleReg', '==', formData.vehicleReg));
       const querySnapshot = await getDocs(q);
 
@@ -376,7 +389,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
 
       const updatedValue = formData.vehicleReg.trim().toUpperCase();
       if (updatedValue !== '') {
-        const accountsCollection = collection(firestore, 'accounts');
+        const accountsCollection = collection(firestore, accountsCollectionName);
         const q = query(accountsCollection, where('vehicleReg', '==', updatedValue));
         const querySnapshot = await getDocs(q);
 

@@ -8,6 +8,20 @@ import DatePicker from '../components/DatePicker/DatePicker';
 import './AppointmentsPage.css';
 
 function AppointmentsPage() {
+  // Determine the domain
+  const hostname = window.location.hostname;
+  let locationSuffix = '';
+
+  if (hostname.includes('asgennislive.ie')) {
+    locationSuffix = '_ennis'; // Ennis site
+  } else if (hostname.includes('asglive.ie')) {
+    locationSuffix = ''; // Main site
+  }
+
+  // Define the collection names
+  const appointmentsCollectionName = 'appointments' + locationSuffix;
+  const accountsCollectionName = 'accounts' + locationSuffix;
+
   const [appointments, setAppointments] = useState([]);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -55,7 +69,7 @@ function AppointmentsPage() {
     setUserRole(role);
 
     const fetchAppointments = () => {
-      const q = query(collection(firestore, 'appointments'), where('date', '==', selectedDate.toDateString()));
+      const q = query(collection(firestore, appointmentsCollectionName), where('date', '==', selectedDate.toDateString()));
       const unsubscribe = onSnapshot(q, (querySnapshot) => {
         const fetchedAppointments = [];
         querySnapshot.forEach(doc => {
@@ -69,7 +83,7 @@ function AppointmentsPage() {
 
     const unsubscribe = fetchAppointments();
     return () => unsubscribe(); // Clean up the real-time listener when the date changes or component unmounts
-  }, [selectedDate]);
+  }, [selectedDate, appointmentsCollectionName]);
 
   const isNonWorkingDay = (date) => {
     const day = date.getDay(); // 0 = Sunday, 6 = Saturday
@@ -100,15 +114,15 @@ function AppointmentsPage() {
   const handleSaveAppointment = async (newAppointment) => {
     // Allow technicians to save only if the appointment already exists (has an ID)
     if (userRole !== 'admin' && !newAppointment.id) {
-        alert('Technicians cannot create new appointments. Please contact an admin.');
-        return;
+      alert('Technicians cannot create new appointments. Please contact an admin.');
+      return;
     }
 
     const sameDayOverlap = checkOverlap(newAppointment);
 
     if (sameDayOverlap) {
-        alert('This appointment overlaps with an existing appointment for this technician.');
-        return; // Prevent saving if overlap is detected
+      alert('This appointment overlaps with an existing appointment for this technician.');
+      return; // Prevent saving if overlap is detected
     }
 
     // Determine if the appointment spans multiple days
@@ -119,80 +133,80 @@ function AppointmentsPage() {
     const availableSlotsToday = workdayEndIndex - startTimeIndex;
 
     if (totalSlotsNeeded > availableSlotsToday) {
-        // Handle multi-day appointments
-        const remainingSlots = totalSlotsNeeded - availableSlotsToday;
-        const nextDay = getNextWorkingDay(new Date(newAppointment.date));
-        const nextDayOverlap = await checkNextDayOverlap(nextDay, remainingSlots, newAppointment.tech);
+      // Handle multi-day appointments
+      const remainingSlots = totalSlotsNeeded - availableSlotsToday;
+      const nextDay = getNextWorkingDay(new Date(newAppointment.date));
+      const nextDayOverlap = await checkNextDayOverlap(nextDay, remainingSlots, newAppointment.tech);
 
-        if (nextDayOverlap) {
-            alert('The appointment would overlap with an existing appointment on the next working day.');
-            return; // Prevent saving if overlap is detected on the next day
-        }
+      if (nextDayOverlap) {
+        alert('The appointment would overlap with an existing appointment on the next working day.');
+        return; // Prevent saving if overlap is detected on the next day
+      }
 
-        // Split the appointment into two parts (today and next working day)
-        const updatedAppointment = {
-            ...newAppointment,
-            details: {
-                ...newAppointment.details,
-                expectedTime: availableSlotsToday,
-            },
+      // Split the appointment into two parts (today and next working day)
+      const updatedAppointment = {
+        ...newAppointment,
+        details: {
+          ...newAppointment.details,
+          expectedTime: availableSlotsToday,
+        },
+      };
+
+      if (updatedAppointment.id) {
+        const appointmentRef = doc(firestore, appointmentsCollectionName, updatedAppointment.id);
+        await updateDoc(appointmentRef, updatedAppointment);
+      } else {
+        const docRef = await addDoc(collection(firestore, appointmentsCollectionName), updatedAppointment);
+        updatedAppointment.id = docRef.id;
+      }
+
+      if (remainingSlots > 0) {
+        const nextDayAppointment = {
+          ...newAppointment,
+          date: nextDay.toDateString(),
+          startTime: workdayStart,
+          details: {
+            ...newAppointment.details,
+            expectedTime: remainingSlots,
+          },
         };
 
-        if (updatedAppointment.id) {
-            const appointmentRef = doc(firestore, 'appointments', updatedAppointment.id);
-            await updateDoc(appointmentRef, updatedAppointment);
-        } else {
-            const docRef = await addDoc(collection(firestore, 'appointments'), updatedAppointment);
-            updatedAppointment.id = docRef.id;
-        }
-
-        if (remainingSlots > 0) {
-            const nextDayAppointment = {
-                ...newAppointment,
-                date: nextDay.toDateString(),
-                startTime: workdayStart,
-                details: {
-                    ...newAppointment.details,
-                    expectedTime: remainingSlots,
-                },
-            };
-
-            await addDoc(collection(firestore, 'appointments'), nextDayAppointment);
-        }
+        await addDoc(collection(firestore, appointmentsCollectionName), nextDayAppointment);
+      }
     } else {
-        // Save normally if it doesn't span into the next day
-        if (newAppointment.id) {
-            const appointmentRef = doc(firestore, 'appointments', newAppointment.id);
-            await updateDoc(appointmentRef, newAppointment);
-        } else {
-            const docRef = await addDoc(collection(firestore, 'appointments'), newAppointment);
-            newAppointment.id = docRef.id;
-        }
+      // Save normally if it doesn't span into the next day
+      if (newAppointment.id) {
+        const appointmentRef = doc(firestore, appointmentsCollectionName, newAppointment.id);
+        await updateDoc(appointmentRef, newAppointment);
+      } else {
+        const docRef = await addDoc(collection(firestore, appointmentsCollectionName), newAppointment);
+        newAppointment.id = docRef.id;
+      }
     }
 
     // Update the associated account information
-    const accountRef = doc(firestore, 'accounts', newAppointment.details.vehicleReg);
+    const accountRef = doc(firestore, accountsCollectionName, newAppointment.details.vehicleReg);
     const accountData = {
-        vehicleReg: newAppointment.details.vehicleReg,
-        customerName: newAppointment.details.customerName,
-        customerPhone: newAppointment.details.customerPhone,
-        vehicleMake: newAppointment.details.vehicleMake,
+      vehicleReg: newAppointment.details.vehicleReg,
+      customerName: newAppointment.details.customerName,
+      customerPhone: newAppointment.details.customerPhone,
+      vehicleMake: newAppointment.details.vehicleMake,
     };
 
     await setDoc(accountRef, accountData, { merge: true });
 
     setAppointments((prev) => {
-        const existingAppointmentIndex = prev.findIndex(app => app.id === newAppointment.id);
-        if (existingAppointmentIndex !== -1) {
-            const updatedAppointments = [...prev];
-            updatedAppointments[existingAppointmentIndex] = newAppointment;
-            return updatedAppointments;
-        }
-        return [...prev, newAppointment];
+      const existingAppointmentIndex = prev.findIndex(app => app.id === newAppointment.id);
+      if (existingAppointmentIndex !== -1) {
+        const updatedAppointments = [...prev];
+        updatedAppointments[existingAppointmentIndex] = newAppointment;
+        return updatedAppointments;
+      }
+      return [...prev, newAppointment];
     });
 
     setIsModalOpen(false);
-};
+  };
 
 
 
@@ -282,7 +296,7 @@ function AppointmentsPage() {
   };
 
   const checkNextDayOverlap = async (nextDay, remainingSlots, tech) => {
-    const q = query(collection(firestore, 'appointments'), where('date', '==', nextDay.toDateString()));
+    const q = query(collection(firestore, appointmentsCollectionName), where('date', '==', nextDay.toDateString()));
     const querySnapshot = await getDocs(q);
 
     const appointmentsOnNextDay = [];
@@ -332,7 +346,7 @@ function AppointmentsPage() {
   const handleDeleteAppointment = async (id) => {
     if (userRole !== 'admin') return; // Restrict deletion for non-admin users
 
-    await deleteDoc(doc(firestore, 'appointments', id));
+    await deleteDoc(doc(firestore, appointmentsCollectionName, id));
     setAppointments((prev) => prev.filter(app => app.id !== id));
     setIsModalOpen(false);
   };
@@ -355,13 +369,13 @@ function AppointmentsPage() {
       prevAppointments.map((app) =>
         app.id === appointmentId
           ? {
-              ...app,
-              details: {
-                ...app.details,
-                inProgress: true,
-                newTasksAdded: false,  // Reset any previous flags
-              },
-            }
+            ...app,
+            details: {
+              ...app.details,
+              inProgress: true,
+              newTasksAdded: false,  // Reset any previous flags
+            },
+          }
           : app
       )
     );
