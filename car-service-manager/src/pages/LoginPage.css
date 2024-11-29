@@ -69,4 +69,27 @@ body {
   .login-button:hover {
     background: #555;
   }
+
+  /* Added styles for password input with toggle icon */
+.password-group .password-input-container {
+  position: relative;
+}
+
+.password-group .password-input-container input {
+  width: 100%;
+  padding-right: 40px; /* Space for the toggle icon */
+}
+
+.password-toggle-icon {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: #333;
+}
+
+.password-toggle-icon:focus {
+  outline: none;
+}
   
