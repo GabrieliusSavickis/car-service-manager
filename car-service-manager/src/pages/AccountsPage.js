@@ -67,7 +67,7 @@ const AccountsPage = () => {
   };
 
   const handleViewServiceHistory = async (vehicleReg) => {
-    const appointmentsRef = collection(firestore, 'appointments');
+    const appointmentsRef = collection(firestore, `appointments${locationSuffix}`);
     const q = query(appointmentsRef, where('details.vehicleReg', '==', vehicleReg));
     const querySnapshot = await getDocs(q);
     const appointmentsList = querySnapshot.docs.map(doc => {
