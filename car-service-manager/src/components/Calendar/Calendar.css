@@ -1,6 +1,6 @@
 .calendar-container {
   display: grid;
-  grid-template-columns: 100px repeat(4, 1fr); /* Adjust column sizes */
+  /* grid-template-columns: 100px repeat(4, 1fr); Adjust column sizes */
   background-color: #ddd;
 }
 

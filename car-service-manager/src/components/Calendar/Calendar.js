@@ -86,26 +86,43 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians }) => {
   };
 
   return (
-    <div className="calendar-container">
+    <div
+      className="calendar-container"
+      style={{
+        // Dynamically set the number of columns: 1 column for time + N columns for technicians
+        gridTemplateColumns: `100px repeat(${technicians.length}, 1fr)`,
+      }}
+    >
       <div className="calendar-header">
         <div className="time-header"></div>
         {technicians.map((tech) => (
-          <div key={tech} className="tech-header">{tech}</div>
+          <div key={tech} className="tech-header">
+            {tech}
+          </div>
         ))}
       </div>
+
       <div className="calendar-body">
-        {timeSlots.map((time, index) => (
+        {timeSlots.map((time) => (
           <React.Fragment key={time}>
+            {/* If we hit 13:30, show the lunch break divider.  */}
             {time === '13:30' && (
-              <div className="lunch-break-divider" key="lunch-break">
+              <div
+                className="lunch-break-divider"
+                // Dynamically span across all columns: 1 for time + length of technicians
+                style={{ gridColumn: `1 / span ${technicians.length + 1}` }}
+              >
                 <div className="lunch-break-label">Lunch Break</div>
               </div>
             )}
 
             <div className="time-slot-row">
               <div className="time-label">{time}</div>
+
               {technicians.map((tech, techIndex) => {
-                const appointment = appointments.find(app => app.startTime === time && app.tech === tech);
+                const appointment = appointments.find(
+                  (app) => app.startTime === time && app.tech === tech
+                );
 
                 return (
                   <div
@@ -119,13 +136,18 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians }) => {
                         className="appointment"
                         style={{
                           backgroundColor: getAppointmentColor(appointment),
-                          height: getAppointmentHeight(calculateAppointmentSpan(appointment)),
+                          height: getAppointmentHeight(
+                            calculateAppointmentSpan(appointment)
+                          ),
                           gridRow: `span ${calculateAppointmentSpan(appointment)}`,
                         }}
                       >
                         <div>{appointment.details.vehicleReg}</div>
                         <div>
-                          {getAppointmentTaskText(appointment, calculateAppointmentSpan(appointment))}
+                          {getAppointmentTaskText(
+                            appointment,
+                            calculateAppointmentSpan(appointment)
+                          )}
                         </div>
                       </div>
                     )}

@@ -24,8 +24,8 @@ function AppointmentsPage() {
 
    // Define the technicians array based on the domain
    const technicians = hostname.includes('asgennislive.ie')
-   ? ['Zenia', 'Nick', 'Vova', 'Vladik']
-   : ['Audrius', 'Adomas', 'Igor', 'Vitalik'];
+   ? ['Zenia', 'Nick', 'Vova', 'Vladik', 'Audrius']
+   : ['Audrius', 'Adomas', 'Igor', 'Vitalik', 'Valera'];
 
   const [appointments, setAppointments] = useState([]);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
