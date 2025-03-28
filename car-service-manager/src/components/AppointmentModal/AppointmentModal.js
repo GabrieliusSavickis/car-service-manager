@@ -68,8 +68,8 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
 
   // Define the technicians array based on the domain
   const technicianOptions = hostname.includes('asgennislive.ie')
-    ? ['Zenia', 'Nick', 'Vova', 'Vladik']
-    : ['Audrius', 'Adomas', 'Igor', 'Vitalik'];
+    ? ['Zenia', 'Nick', 'Vova', 'Vladik', 'Audrius']
+    : ['Audrius', 'Adomas', 'Igor', 'Vitalik', 'Valera'];
 
   // Define the collection names
   const accountsCollectionName = 'accounts' + locationSuffix;
