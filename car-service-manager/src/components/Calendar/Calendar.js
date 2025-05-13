@@ -1,3 +1,4 @@
+// src/components/Calendar/Calendar.js
 import React from 'react';
 import './Calendar.css';
 
@@ -13,8 +14,6 @@ const timeSlots = [
   '16:00', '16:30',
   '17:00', '17:30',
 ];
-
-// const technicians = ['Audrius', 'Adomas', 'Igor', 'Vitalik'];
 
 const Calendar = ({ appointments, onTimeSlotClick, technicians }) => {
 
@@ -58,7 +57,6 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians }) => {
       return '#f44336';  // Red if new tasks were added after check-in
     }
     if (appointment.details.newCommentsAdded) {
-      console.log("Color set to red due to new comment.");
       return '#f44336'; // Red if a new comment was added
     }
     if (appointment.details.tasks.every(task => task.completed)) {
@@ -74,56 +72,56 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians }) => {
       ? appointment.details.tasks.map(task => task.text).join(", ") 
       : 'No tasks available';
 
-    // Set a dynamic character limit based on the span of the appointment
     const baseLimit = 20; // Adjust this number as needed
     const characterLimit = baseLimit * span;
 
     if (taskText.length > characterLimit) {
       return taskText.slice(0, characterLimit) + '...';
     }
-
     return taskText;
+  };
+
+  // New helper to build a "09:00 – 12:00" label
+  const getAppointmentTimeRange = (appointment) => {
+    const start = appointment.startTime;
+    const slots = appointment.details.expectedTime;
+    const startIdx = timeSlots.indexOf(start);
+    const endIdx = Math.min(startIdx + slots, timeSlots.length - 1);
+    const end = timeSlots[endIdx];
+    return `${start} – ${end}`;
   };
 
   return (
     <div
       className="calendar-container"
       style={{
-        // Dynamically set the number of columns: 1 column for time + N columns for technicians
         gridTemplateColumns: `100px repeat(${technicians.length}, 1fr)`,
       }}
     >
       <div className="calendar-header">
         <div className="time-header"></div>
         {technicians.map((tech) => (
-          <div key={tech} className="tech-header">
-            {tech}
-          </div>
+          <div key={tech} className="tech-header">{tech}</div>
         ))}
       </div>
 
       <div className="calendar-body">
         {timeSlots.map((time) => (
           <React.Fragment key={time}>
-            {/* If we hit 13:30, show the lunch break divider.  */}
             {time === '13:30' && (
               <div
                 className="lunch-break-divider"
-                // Dynamically span across all columns: 1 for time + length of technicians
                 style={{ gridColumn: `1 / span ${technicians.length + 1}` }}
               >
                 <div className="lunch-break-label">Lunch Break</div>
               </div>
             )}
-
             <div className="time-slot-row">
               <div className="time-label">{time}</div>
-
               {technicians.map((tech, techIndex) => {
                 const appointment = appointments.find(
                   (app) => app.startTime === time && app.tech === tech
                 );
-
                 return (
                   <div
                     key={techIndex}
@@ -132,7 +130,6 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians }) => {
                   >
                     {appointment && (
                       <div
-                        key={appointment.id}
                         className="appointment"
                         style={{
                           backgroundColor: getAppointmentColor(appointment),
@@ -142,6 +139,11 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians }) => {
                           gridRow: `span ${calculateAppointmentSpan(appointment)}`,
                         }}
                       >
+                        {/* Time range in bold */}
+                        <div className="appointment-time">
+                          <strong>{getAppointmentTimeRange(appointment)}</strong>
+                        </div>
+                        {/* Vehicle reg & tasks */}
                         <div>{appointment.details.vehicleReg}</div>
                         <div>
                           {getAppointmentTaskText(
