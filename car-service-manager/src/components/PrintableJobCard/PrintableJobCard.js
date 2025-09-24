@@ -18,6 +18,8 @@ const PrintableJobCard = forwardRef(({ appointment }, ref) => {
       <p><strong>Customer Name:</strong> {details.customerName || 'N/A'}</p>
       <p><strong>Customer Phone:</strong> {details.customerPhone || 'N/A'}</p>
       <p><strong>Appointment Date:</strong> {appointment?.date || 'N/A'}</p>
+      <p><strong>Mechanic:</strong> {appointment?.tech || 'N/A'}</p>
+      
 
       <h3>Tasks</h3>
       <ul>
