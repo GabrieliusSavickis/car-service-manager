@@ -67,6 +67,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   }
 
   // Define the technicians array based on the domain
+  // IMPORTANT: when you update technicians names, the previous appointments tied to the old names will not update, so you may want to consider using unique IDs for technicians in the future to avoid this issue
   const technicianOptions = hostname.includes('asgennislive.ie')
     ? ['Mateus', 'Nick', 'Vova', 'Oleksee', 'Audrius']
     : ['Audrius', 'Adomas', 'Igor', 'Vitalik', 'Valera'];
