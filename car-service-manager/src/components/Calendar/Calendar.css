@@ -19,6 +19,33 @@
   text-align: center;
 }
 
+/* Layout for header name + edit icon */
+.tech-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px; /* spacing between name and icon */
+}
+
+.tech-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px; /* prevent name from pushing too far */
+}
+
+.tech-edit-icon {
+  font-size: 0.85rem; /* slightly smaller icon */
+  opacity: 0.5; /* dim by default */
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.12s ease;
+}
+
+.tech-edit-icon:hover {
+  opacity: 0.9; /* highlight on hover */
+  transform: translateY(-1px);
+}
+
 .calendar-body {
   display: contents;
 }

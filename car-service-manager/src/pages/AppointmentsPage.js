@@ -6,7 +6,7 @@ import { firestore } from '../firebase'; // Import Firestore
 import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, setDoc, onSnapshot, getDocs } from 'firebase/firestore';
 import DatePicker from '../components/DatePicker/DatePicker';
 import './AppointmentsPage.css';
-import { getTechnicians } from '../utils/technicianUtils';
+import { getTechnicians, clearTechniciansCache } from '../utils/technicianUtils';
 
 function AppointmentsPage() {
   // Determine the domain
@@ -101,6 +101,33 @@ function AppointmentsPage() {
 
     loadTechnicians();
   }, [locationSuffix]);
+
+  // Allow inline editing of technician names from the calendar
+  const handleEditTechnician = async (techId, currentName) => {
+    // Only allow admins to rename technicians
+    const role = sessionStorage.getItem('userRole');
+    if (role !== 'admin') {
+      alert('Only admins can rename mechanics.');
+      return;
+    }
+
+    const newName = window.prompt('Enter new name for mechanic:', currentName);
+    if (!newName) return;
+    const trimmed = newName.trim();
+    if (trimmed === '' || trimmed === currentName) return;
+
+    try {
+      const techDocRef = doc(firestore, `technicians${locationSuffix}`, techId);
+      await updateDoc(techDocRef, { name: trimmed });
+      // Clear cached technicians and reload
+      clearTechniciansCache();
+      const refreshed = await getTechnicians(locationSuffix);
+      setTechnicians(refreshed);
+    } catch (error) {
+      console.error('Error updating technician name:', error);
+      alert('Failed to update mechanic name.');
+    }
+  };
 
   const isNonWorkingDay = (date) => {
     const day = date.getDay(); // 0 = Sunday, 6 = Saturday
@@ -414,6 +441,7 @@ function AppointmentsPage() {
         appointments={appointments}
         onTimeSlotClick={handleTimeSlotClick}
         technicians={technicians}
+        onEditTechnician={handleEditTechnician}
       />
       {isModalOpen && (
         <AppointmentModal

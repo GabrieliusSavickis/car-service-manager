@@ -1,6 +1,7 @@
 // src/components/Calendar/Calendar.js
 import React from 'react';
 import './Calendar.css';
+import { FaEdit } from 'react-icons/fa';
 
 // Define time slots excluding lunch
 const timeSlots = [
@@ -15,7 +16,7 @@ const timeSlots = [
   '17:00', '17:30',
 ];
 
-const Calendar = ({ appointments, onTimeSlotClick, technicians }) => {
+const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician }) => {
 
   const calculateAppointmentSpan = (appointment) => {
     const startTimeIndex = timeSlots.indexOf(appointment.startTime);
@@ -101,7 +102,16 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians }) => {
       <div className="calendar-header">
         <div className="time-header"></div>
         {technicians.map((tech) => (
-          <div key={tech.id} className="tech-header">{tech.name}</div>
+          <div key={tech.id} className="tech-header">
+            <span className="tech-name">{tech.name}</span>
+            {onEditTechnician && (
+              <FaEdit
+                className="tech-edit-icon"
+                title={`Edit ${tech.name}`}
+                onClick={(e) => { e.stopPropagation(); onEditTechnician(tech.id, tech.name); }}
+              />
+            )}
+          </div>
         ))}
       </div>
 
