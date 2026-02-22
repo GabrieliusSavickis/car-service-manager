@@ -6,6 +6,7 @@ import { firestore } from '../firebase'; // Import Firestore
 import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, setDoc, onSnapshot, getDocs } from 'firebase/firestore';
 import DatePicker from '../components/DatePicker/DatePicker';
 import './AppointmentsPage.css';
+import { getTechnicians } from '../utils/technicianUtils';
 
 function AppointmentsPage() {
   // Determine the domain
@@ -22,17 +23,14 @@ function AppointmentsPage() {
   const appointmentsCollectionName = 'appointments' + locationSuffix;
   const accountsCollectionName = 'accounts' + locationSuffix;
 
-   // Define the technicians array based on the domain
-   const technicians = hostname.includes('asgennislive.ie')
-   ? ['Mateus', 'Nick', 'Vova', 'Oleksee', 'Audrius']
-   : ['Audrius', 'Adomas', 'Igor', 'Vitalik', 'Valera'];
-
   const [appointments, setAppointments] = useState([]);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [userRole, setUserRole] = useState('');
   const [warningMessage, setWarningMessage] = useState(''); // For showing warnings to users
+  const [technicians, setTechnicians] = useState([]);
+  const [loadingTechnicians, setLoadingTechnicians] = useState(true);
 
   const staticBankHolidays = [
     '01/01', '17/03', '25/12', '26/12', // Fixed date holidays
@@ -90,6 +88,22 @@ function AppointmentsPage() {
     return () => unsubscribe(); // Clean up the real-time listener when the date changes or component unmounts
   }, [selectedDate, appointmentsCollectionName]);
 
+  // Load technicians from Firestore
+  useEffect(() => {
+    const loadTechnicians = async () => {
+      try {
+        const fetchedTechnicians = await getTechnicians(locationSuffix);
+        setTechnicians(fetchedTechnicians);
+      } catch (error) {
+        console.error('Error loading technicians:', error);
+      } finally {
+        setLoadingTechnicians(false);
+      }
+    };
+
+    loadTechnicians();
+  }, [locationSuffix]);
+
   const isNonWorkingDay = (date) => {
     const day = date.getDay(); // 0 = Sunday, 6 = Saturday
     const formattedDate = date.toLocaleDateString('en-IE').substring(0, 5); // Format MM/DD
@@ -99,7 +113,7 @@ function AppointmentsPage() {
     return day === 0 || day === 6 || staticBankHolidays.includes(formattedDate) || dynamicBankHolidays.includes(date.toLocaleDateString('en-IE'));
   };
 
-  const handleTimeSlotClick = (time, tech) => {
+  const handleTimeSlotClick = (time, techId) => {
     const selectedDay = new Date(selectedDate);
 
     if (isNonWorkingDay(selectedDay)) {
@@ -107,11 +121,11 @@ function AppointmentsPage() {
       return;
     }
 
-    const appointment = appointments.find(app => app.startTime === time && app.tech === tech);
+    const appointment = appointments.find(app => app.startTime === time && (app.techId === techId || app.tech === techId));
     if (appointment) {
       setSelectedAppointment(appointment);
     } else {
-      setSelectedAppointment({ startTime: time, tech, endTime: getEndTime(time), date: selectedDate.toDateString() });
+      setSelectedAppointment({ startTime: time, techId, endTime: getEndTime(time), date: selectedDate.toDateString() });
     }
     setIsModalOpen(true);
   };
@@ -141,7 +155,7 @@ function AppointmentsPage() {
       // Handle multi-day appointments
       const remainingSlots = totalSlotsNeeded - availableSlotsToday;
       const nextDay = getNextWorkingDay(new Date(newAppointment.date));
-      const nextDayOverlap = await checkNextDayOverlap(nextDay, remainingSlots, newAppointment.tech);
+      const nextDayOverlap = await checkNextDayOverlap(nextDay, remainingSlots, newAppointment.techId || newAppointment.tech);
 
       if (nextDayOverlap) {
         alert('The appointment would overlap with an existing appointment on the next working day.');
@@ -216,7 +230,7 @@ function AppointmentsPage() {
 
 
   const checkOverlap = (newAppointment) => {
-    const { startTime, details, tech, date, id } = newAppointment; // Get the appointment ID
+    const { startTime, details, techId, date, id } = newAppointment; // Get the appointment ID and use techId
     const startIndex = timeSlots.indexOf(startTime);
     const appointmentDate = new Date(date);
     const totalSlotsNeeded = details.expectedTime;
@@ -229,8 +243,8 @@ function AppointmentsPage() {
     const checkDayOverlap = (currentDate, startIndex, remainingSlots) => {
       const isSameDay = currentDate.toDateString() === appointmentDate.toDateString();
       const appointmentsOnCurrentDay = appointments.filter(app => {
-        // Exclude the current appointment by checking the ID
-        return app.tech === tech && new Date(app.date).toDateString() === currentDate.toDateString() && app.id !== id;
+        // Exclude the current appointment by checking the ID, support both old (tech) and new (techId) format
+        return (app.techId === techId || app.tech === techId) && new Date(app.date).toDateString() === currentDate.toDateString() && app.id !== id;
       });
 
       if (isSameDay) {
@@ -300,7 +314,7 @@ function AppointmentsPage() {
     return false; // No overlap detected
   };
 
-  const checkNextDayOverlap = async (nextDay, remainingSlots, tech) => {
+  const checkNextDayOverlap = async (nextDay, remainingSlots, techId) => {
     const q = query(collection(firestore, appointmentsCollectionName), where('date', '==', nextDay.toDateString()));
     const querySnapshot = await getDocs(q);
 
@@ -313,7 +327,8 @@ function AppointmentsPage() {
     const spanEndIndex = Math.min(remainingSlots, timeSlots.length);
 
     for (let app of appointmentsOnNextDay) {
-      if (app.tech === tech) {
+      // Support both old (tech) and new (techId) format
+      if (app.techId === techId || app.tech === techId) {
         const existingStartIndex = timeSlots.indexOf(app.startTime);
         const existingEndIndex = existingStartIndex + app.details.expectedTime;
 

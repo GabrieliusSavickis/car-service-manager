@@ -1,5 +1,6 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useState, useEffect } from 'react';
 import './PrintableJobCard.css';
+import { getTechnicianName } from '../../utils/technicianUtils';
 
 const PrintableJobCard = forwardRef(({ appointment }, ref) => {
   const details = appointment?.details || {};
@@ -8,6 +9,29 @@ const PrintableJobCard = forwardRef(({ appointment }, ref) => {
 
    // Split comments by new line characters
    const formattedComments = comments.split('\n');
+
+  const [technicianName, setTechnicianName] = useState(appointment?.tech || 'Unknown');
+
+  useEffect(() => {
+    const loadTechnicianName = async () => {
+      // Determine the domain
+      const hostname = window.location.hostname;
+      let locationSuffix = '';
+
+      if (hostname.includes('asgennislive.ie')) {
+        locationSuffix = '_ennis'; // Ennis site
+      } else if (hostname.includes('asglive.ie')) {
+        locationSuffix = ''; // Main site
+      }
+
+      if (appointment?.techId) {
+        const name = await getTechnicianName(appointment.techId, locationSuffix);
+        setTechnicianName(name);
+      }
+    };
+
+    loadTechnicianName();
+  }, [appointment?.techId, appointment?.tech]);
 
   return (
     <div ref={ref} className="job-card">
@@ -18,7 +42,7 @@ const PrintableJobCard = forwardRef(({ appointment }, ref) => {
       <p><strong>Customer Name:</strong> {details.customerName || 'N/A'}</p>
       <p><strong>Customer Phone:</strong> {details.customerPhone || 'N/A'}</p>
       <p><strong>Appointment Date:</strong> {appointment?.date || 'N/A'}</p>
-      <p><strong>Mechanic:</strong> {appointment?.tech || 'N/A'}</p>
+      <p><strong>Mechanic:</strong> {technicianName}</p>
       
 
       <h3>Tasks</h3>

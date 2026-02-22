@@ -5,6 +5,7 @@ import { firestore } from '../../firebase';
 import { collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import PrintableJobCard from '../PrintableJobCard/PrintableJobCard';
 import ReactToPrint from 'react-to-print';
+import { getTechnicians, getTechnicianName } from '../../utils/technicianUtils';
 
 const timeOptions = [
   { label: '30 minutes', value: 1 },
@@ -25,8 +26,6 @@ const timeOptions = [
   { label: '8 hours', value: 16 },
 ];
 
-// const technicianOptions = ['Audrius', 'Adomas', 'Igor', 'Vitalik']; // Assuming these are your technician names
-
 // Define initial form data
 const initialFormData = {
   vehicleReg: '',
@@ -45,8 +44,8 @@ const initialFormData = {
   totalTimeSpent: null,
   isPaused: false,
   comments: '',
-  technicianTimes: {}, // Stores the total time spent by each technician
-  currentTechnician: null, // Track the currently active technician
+  technicianTimes: {}, // Stores the total time spent by each technician (keyed by technicianId)
+  currentTechnicianId: null, // Track the currently active technician ID
   newCommentsAdded: false, // Include this field as well
   checkInTime: null, // To store the check-in time
   completionTime: null, // To store the completion time
@@ -66,25 +65,22 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     locationSuffix = ''; // Main site
   }
 
-  // Define the technicians array based on the domain
-  // IMPORTANT: when you update technicians names, the previous appointments tied to the old names will not update, so you may want to consider using unique IDs for technicians in the future to avoid this issue
-  const technicianOptions = hostname.includes('asgennislive.ie')
-    ? ['Mateus', 'Nick', 'Vova', 'Oleksee', 'Audrius']
-    : ['Audrius', 'Adomas', 'Igor', 'Vitalik', 'Valera'];
-
   // Define the collection names
   const accountsCollectionName = 'accounts' + locationSuffix;
+  const techniciansCollectionName = 'technicians' + locationSuffix;
 
   const [formData, setFormData] = useState(initialFormData);
   const [newTask, setNewTask] = useState('');
   const [userRole, setUserRole] = useState('');
   const [username, setUsername] = useState('');
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false); // State for reschedule modal
-  const [newTechnician, setNewTechnician] = useState('');
+  const [newTechnicianId, setNewTechnicianId] = useState('');
   const [newDate, setNewDate] = useState('');
   const [newTime, setNewTime] = useState('');
   const [initialComments, setInitialComments] = useState('');
   const [vehicleRegLookupStatus, setVehicleRegLookupStatus] = useState('');
+  const [technicians, setTechnicians] = useState([]);
+  const [loadingTechnicians, setLoadingTechnicians] = useState(true);
 
 
   const componentRef = useRef(); // Reference to the PrintableJobCard component
@@ -127,6 +123,22 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       setInitialComments('');
     }
   }, [appointment]);
+
+  // Load technicians from Firestore
+  useEffect(() => {
+    const loadTechnicians = async () => {
+      try {
+        const fetchedTechnicians = await getTechnicians(locationSuffix);
+        setTechnicians(fetchedTechnicians);
+      } catch (error) {
+        console.error('Error loading technicians:', error);
+      } finally {
+        setLoadingTechnicians(false);
+      }
+    };
+
+    loadTechnicians();
+  }, [locationSuffix]);
 
 
   const handleChange = (e) => {
@@ -179,7 +191,8 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     setFormData((prev) => {
       const updatedTasks = [...prev.tasks];
       const currentTask = updatedTasks[index];
-      const technician = username;
+      const technician = username; // For display purposes
+      const technicianId = prev.currentTechnicianId; // For tracking time
 
       const currentTime = new Date();
       let timeSpent = 0;
@@ -221,12 +234,14 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       currentTask.completedBy = technician;
       currentTask.timeSpent = timeSpent;
 
-      // Update technician's total time
+      // Update technician's total time (using technicianId as key)
       const updatedTechnicianTimes = { ...prev.technicianTimes };
-      if (updatedTechnicianTimes[technician]) {
-        updatedTechnicianTimes[technician] += timeSpent;
-      } else {
-        updatedTechnicianTimes[technician] = timeSpent;
+      if (technicianId) {
+        if (updatedTechnicianTimes[technicianId]) {
+          updatedTechnicianTimes[technicianId] += timeSpent;
+        } else {
+          updatedTechnicianTimes[technicianId] = timeSpent;
+        }
       }
 
       // Check if all tasks are completed
@@ -259,13 +274,17 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
 
   const handleCheckIn = () => {
     const currentTime = new Date();
+    // Find the technician ID for the current username
+    const currentTech = technicians.find(t => t.name === username);
+    const currentTechId = currentTech ? currentTech.id : null;
+
     setFormData((prev) => ({
       ...prev,
       inProgress: true,
       startTime: prev.startTime || currentTime, // Keep original startTime if it exists
       resumeTime: currentTime, // Set resumeTime to current time
       checkInTime: prev.checkInTime || currentTime, // Keep original check-in time
-      currentTechnician: username,
+      currentTechnicianId: currentTechId, // Store the technician ID
     }));
     onCheckIn(appointment.id);
   };
@@ -278,11 +297,13 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       const technicianTime = pauseTime - new Date(prev.resumeTime || prev.startTime);
       const updatedTechnicianTimes = { ...prev.technicianTimes };
 
-      // Add the time spent to the current technician's total
-      if (updatedTechnicianTimes[prev.currentTechnician]) {
-        updatedTechnicianTimes[prev.currentTechnician] += Math.floor(technicianTime / 60000);
-      } else {
-        updatedTechnicianTimes[prev.currentTechnician] = Math.floor(technicianTime / 60000);
+      // Add the time spent to the current technician's total (using ID as key)
+      if (prev.currentTechnicianId) {
+        if (updatedTechnicianTimes[prev.currentTechnicianId]) {
+          updatedTechnicianTimes[prev.currentTechnicianId] += Math.floor(technicianTime / 60000);
+        } else {
+          updatedTechnicianTimes[prev.currentTechnicianId] = Math.floor(technicianTime / 60000);
+        }
       }
 
       return {
@@ -297,11 +318,15 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
 
   const handleResume = () => {
     const resumeTime = new Date();
+    // Find the technician ID for the current username
+    const currentTech = technicians.find(t => t.name === username);
+    const currentTechId = currentTech ? currentTech.id : null;
+
     setFormData((prev) => ({
       ...prev,
       isPaused: false,
       resumeTime,
-      currentTechnician: username, // Update to the current technician
+      currentTechnicianId: currentTechId, // Update to the current technician ID
     }));
   };
 
@@ -379,7 +404,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     // Create the updated appointment with the new date
     const updatedAppointment = {
       ...appointment,
-      tech: newTechnician,
+      techId: newTechnicianId, // Use technician ID instead of name
       date: formattedDate, // Use the formatted date
       startTime: newTime,
     };
@@ -657,12 +682,13 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
               <label>
                 Technician:
                 <select
-                  value={newTechnician}
-                  onChange={(e) => setNewTechnician(e.target.value)}
+                  value={newTechnicianId}
+                  onChange={(e) => setNewTechnicianId(e.target.value)}
+                  disabled={loadingTechnicians}
                 >
                   <option value="">Select Technician</option>
-                  {technicianOptions.map((tech) => (
-                    <option key={tech} value={tech}>{tech}</option>
+                  {technicians.map((tech) => (
+                    <option key={tech.id} value={tech.id}>{tech.name}</option>
                   ))}
                 </select>
               </label>
@@ -687,7 +713,6 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
             </div>
           </div>
         )}
-
         {/* Hidden printable area */}
         <div id="printable-area" style={{ display: 'none' }}>
           <PrintableJobCard ref={componentRef} appointment={appointment || { details: {} }} />

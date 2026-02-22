@@ -101,7 +101,7 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians }) => {
       <div className="calendar-header">
         <div className="time-header"></div>
         {technicians.map((tech) => (
-          <div key={tech} className="tech-header">{tech}</div>
+          <div key={tech.id} className="tech-header">{tech.name}</div>
         ))}
       </div>
 
@@ -120,13 +120,13 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians }) => {
               <div className="time-label">{time}</div>
               {technicians.map((tech, techIndex) => {
                 const appointment = appointments.find(
-                  (app) => app.startTime === time && app.tech === tech
+                  (app) => app.startTime === time && (app.techId === tech.id || app.tech === tech.id || app.tech === tech.name)
                 );
                 return (
                   <div
                     key={techIndex}
                     className="time-slot"
-                    onClick={() => onTimeSlotClick(time, tech)}
+                    onClick={() => onTimeSlotClick(time, tech.id)}
                   >
                     {appointment && (
                       <div

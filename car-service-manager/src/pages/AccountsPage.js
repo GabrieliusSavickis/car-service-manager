@@ -5,6 +5,7 @@ import Header from '../components/Header/Header';
 import './AccountsPage.css';
 import { useNavigate } from 'react-router-dom';
 import { FaCheckCircle, FaTimesCircle, FaChevronDown, FaChevronUp } from 'react-icons/fa';
+import { getTechnicianName } from '../utils/technicianUtils';
 
 import { Collapse } from 'react-collapse';
 
@@ -84,7 +85,7 @@ const AccountsPage = () => {
     const appointmentsRef = collection(firestore, `appointments${locationSuffix}`);
     const q = query(appointmentsRef, where('details.vehicleReg', '==', vehicleReg));
     const querySnapshot = await getDocs(q);
-    const appointmentsList = querySnapshot.docs.map(doc => {
+    const appointmentsList = await Promise.all(querySnapshot.docs.map(async (doc) => {
       const appointment = doc.data();
       // Combine date and startTime
       const date = appointment.date; // Assuming this is a string like "Wed Sep 25 2024"
@@ -104,13 +105,20 @@ const AccountsPage = () => {
       };
       const formattedDateTime = dateTime.toLocaleString('en-US', options);
 
+      // Lookup technician name if using ID
+      let technicianName = appointment.tech;
+      if (appointment.techId) {
+        technicianName = await getTechnicianName(appointment.techId, locationSuffix);
+      }
+
       return {
         id: doc.id,
         ...appointment,
+        technicianName, // Add the resolved technician name
         formattedDateTime,
         isOpen: false, // Add isOpen property
       };
-    });
+    }));
 
     setSelectedAccount(vehicleReg);
     setServiceHistory(appointmentsList);
@@ -201,7 +209,7 @@ const AccountsPage = () => {
                     </div>
                     <Collapse isOpened={appointment.isOpen}>
                       <div className="appointment-details">
-                        <strong>Technician:</strong> {appointment.tech} <br />
+                        <strong>Technician:</strong> {appointment.technicianName || appointment.tech || 'Unknown'} <br />
                         <strong>Tasks:</strong>
                         <ul>
                           {appointment.details.tasks && appointment.details.tasks.length > 0 ? (
