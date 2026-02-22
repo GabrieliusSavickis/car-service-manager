@@ -27,6 +27,21 @@
     outline: none;
     border-color: #c23b22;
   }
+
+  .search-type-dropdown {
+    padding: 10px;
+    margin-right: 10px;
+    border-radius: 5px;
+    border: 1px solid #ddd;
+    font-size: 16px;
+    background-color: white;
+    cursor: pointer;
+  }
+
+  .search-type-dropdown:focus {
+    outline: none;
+    border-color: #c23b22;
+  }
   
   /* Styling the accounts table */
   table {

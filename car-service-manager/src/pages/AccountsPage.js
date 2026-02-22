@@ -26,6 +26,7 @@ const AccountsPage = () => {
 
   const [accounts, setAccounts] = useState([]);
   const [searchReg, setSearchReg] = useState('');
+  const [searchType, setSearchType] = useState('vehicleReg'); // 'vehicleReg' or 'phone'
   const [filteredAccounts, setFilteredAccounts] = useState([]);
   const [selectedAccount, setSelectedAccount] = useState(null); // Track selected account
   const [serviceHistory, setServiceHistory] = useState([]);
@@ -53,17 +54,30 @@ const AccountsPage = () => {
   }, [accountsCollectionName]); // Add accountsCollectionName as a dependency
 
   const handleSearchChange = (e) => {
-    const value = e.target.value.toUpperCase();
+    const value = e.target.value;
     setSearchReg(value);
 
     if (value === '') {
       setFilteredAccounts([]);
     } else {
-      const filtered = accounts.filter(account =>
-        account.vehicleReg.includes(value)
-      );
-      setFilteredAccounts(filtered);
+      if (searchType === 'vehicleReg') {
+        const filtered = accounts.filter(account =>
+          account.vehicleReg.toUpperCase().includes(value.toUpperCase())
+        );
+        setFilteredAccounts(filtered);
+      } else if (searchType === 'phone') {
+        const filtered = accounts.filter(account =>
+          account.customerPhone.includes(value)
+        );
+        setFilteredAccounts(filtered);
+      }
     }
+  };
+
+  const handleSearchTypeChange = (e) => {
+    setSearchType(e.target.value);
+    setSearchReg('');
+    setFilteredAccounts([]);
   };
 
   const handleViewServiceHistory = async (vehicleReg) => {
@@ -108,9 +122,13 @@ const AccountsPage = () => {
       <h1>Accounts</h1>
 
       <div className="search-box">
+        <select value={searchType} onChange={handleSearchTypeChange} className="search-type-dropdown">
+          <option value="vehicleReg">Vehicle Reg</option>
+          <option value="phone">Phone Number</option>
+        </select>
         <input
           type="text"
-          placeholder="Search by Vehicle Reg"
+          placeholder={searchType === 'vehicleReg' ? 'Search by Vehicle Reg' : 'Search by Phone Number'}
           value={searchReg}
           onChange={handleSearchChange}
         />
