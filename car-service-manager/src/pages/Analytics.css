@@ -1,0 +1,50 @@
+.kpi-card {
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+}
+
+/* Gradient KPI shared styles */
+.kpi-gradient {
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(16,24,40,0.06);
+  overflow: hidden;
+}
+
+.kpi-gradient .MuiAvatar-root {
+  background: rgba(255,255,255,0.12) !important;
+  color: #fff !important;
+}
+
+/* Blue */
+.kpi-gradient--blue { background: linear-gradient(135deg, #1565c0 0%, #42a5f5 100%); }
+
+/* Green */
+.kpi-gradient--green { background: linear-gradient(135deg, #2e7d32 0%, #60ad5e 100%); }
+
+/* Orange */
+.kpi-gradient--orange { background: linear-gradient(135deg, #ef6c00 0%, #ffb74d 100%); }
+
+.chart-wrapper {
+  height: 320px;
+}
+
+@media (max-width: 768px) {
+  .chart-wrapper {
+    height: 260px;
+  }
+}
+
+.kpi-card .MuiTypography-subtitle2 {
+  color: rgba(0,0,0,0.6);
+}
+
+.kpi-card .MuiAvatar-root {
+  width: 44px;
+  height: 44px;
+  font-size: 16px;
+}
+
+.range-button {
+  text-transform: none;
+}

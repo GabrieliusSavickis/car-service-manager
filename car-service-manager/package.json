@@ -20,6 +20,16 @@
     "react-to-print": "^2.15.1",
     "web-vitals": "^2.1.4"
   },
+  "optionalDependencies": {
+    "@mui/material": "^5.14.7",
+    "@emotion/react": "^11.11.1",
+    "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.14.0",
+    "@mui/x-date-pickers": "^6.0.0",
+    "date-fns": "^2.30.0",
+    "chart.js": "^4.4.0",
+    "react-chartjs-2": "^5.2.0"
+  },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",

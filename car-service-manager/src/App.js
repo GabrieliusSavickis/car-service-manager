@@ -5,7 +5,7 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import AppointmentsPage from './pages/AppointmentsPage';
 import AccountsPage from './pages/AccountsPage';
-import TechnicianHoursPage from './pages/TechnicianHoursPage';
+import Analytics from './pages/Analytics';
 import ProtectedRoute from './components/ProtectedRoute';
 import { auth } from './firebase';
 
@@ -39,7 +39,7 @@ function App() {
         {/* Protected Routes */}
         <Route path="/appointments" element={<ProtectedRoute component={AppointmentsPage} />} />
         <Route path="/accounts" element={<ProtectedRoute component={AccountsPage} />} />
-        <Route path="/technician-hours" element={<ProtectedRoute component={TechnicianHoursPage} />} />
+        <Route path="/analytics" element={<ProtectedRoute component={Analytics} />} />
       </Routes>
     </Router>
   );
