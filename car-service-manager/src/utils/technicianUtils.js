@@ -1,5 +1,5 @@
 import { firestore } from '../firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 
 // Cache for technicians to avoid repeated Firestore queries
 let techniciansCache = null;

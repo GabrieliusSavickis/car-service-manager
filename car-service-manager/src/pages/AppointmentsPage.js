@@ -30,7 +30,7 @@ function AppointmentsPage() {
   const [userRole, setUserRole] = useState('');
   const [warningMessage, setWarningMessage] = useState(''); // For showing warnings to users
   const [technicians, setTechnicians] = useState([]);
-  const [loadingTechnicians, setLoadingTechnicians] = useState(true);
+  
 
   const staticBankHolidays = [
     '01/01', '17/03', '25/12', '26/12', // Fixed date holidays
@@ -96,8 +96,6 @@ function AppointmentsPage() {
         setTechnicians(fetchedTechnicians);
       } catch (error) {
         console.error('Error loading technicians:', error);
-      } finally {
-        setLoadingTechnicians(false);
       }
     };
 

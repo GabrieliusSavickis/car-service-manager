@@ -5,7 +5,7 @@ import { firestore } from '../../firebase';
 import { collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import PrintableJobCard from '../PrintableJobCard/PrintableJobCard';
 import ReactToPrint from 'react-to-print';
-import { getTechnicians, getTechnicianName } from '../../utils/technicianUtils';
+import { getTechnicians } from '../../utils/technicianUtils';
 
 const timeOptions = [
   { label: '30 minutes', value: 1 },
@@ -67,7 +67,6 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
 
   // Define the collection names
   const accountsCollectionName = 'accounts' + locationSuffix;
-  const techniciansCollectionName = 'technicians' + locationSuffix;
 
   const [formData, setFormData] = useState(initialFormData);
   const [newTask, setNewTask] = useState('');
