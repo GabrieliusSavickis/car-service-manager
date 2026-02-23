@@ -141,6 +141,10 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
                     {appointment && (
                       <div
                         className="appointment"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onTimeSlotClick(time, tech.id);
+                        }}
                         style={{
                           backgroundColor: getAppointmentColor(appointment),
                           height: getAppointmentHeight(

@@ -146,7 +146,16 @@ function AppointmentsPage() {
       return;
     }
 
-    const appointment = appointments.find(app => app.startTime === time && (app.techId === techId || app.tech === techId));
+    // Get the technician name for matching old appointments created before switching to IDs
+    const technicianName = technicians.find(t => t.id === techId)?.name;
+    
+    const appointment = appointments.find(app => 
+      app.startTime === time && (
+        app.techId === techId || 
+        app.tech === techId ||
+        app.tech === technicianName
+      )
+    );
     if (appointment) {
       setSelectedAppointment(appointment);
     } else {
