@@ -264,7 +264,19 @@ function AppointmentsPage() {
 
 
   const checkOverlap = (newAppointment) => {
-    const { startTime, details, techId, date, id } = newAppointment; // Get the appointment ID and use techId
+    const { startTime, details, techId, date, id, tech } = newAppointment; // Get the appointment ID and use techId
+    // Resolve technician name: prefer lookup by techId, otherwise fall back to the appointment's `tech` field
+    const technicianFromId = techId ? technicians.find(t => t.id === techId)?.name : undefined;
+    const technicianName = technicianFromId || tech || undefined;
+      // Debug logging to help track false-positive overlaps
+      console.log('checkOverlap called for:', {
+        id,
+        startTime,
+        expectedTime: details && details.expectedTime,
+        techId,
+        technicianName,
+        date,
+      });
     const startIndex = timeSlots.indexOf(startTime);
     const appointmentDate = new Date(date);
     const totalSlotsNeeded = details.expectedTime;
@@ -277,9 +289,17 @@ function AppointmentsPage() {
     const checkDayOverlap = (currentDate, startIndex, remainingSlots) => {
       const isSameDay = currentDate.toDateString() === appointmentDate.toDateString();
       const appointmentsOnCurrentDay = appointments.filter(app => {
-        // Exclude the current appointment by checking the ID, support both old (tech) and new (techId) format
-        return (app.techId === techId || app.tech === techId) && new Date(app.date).toDateString() === currentDate.toDateString() && app.id !== id;
+        // Exclude the current appointment by checking the ID, support both old (tech) and new (techId/name) formats
+        // Only compare a field when the identifier is available to avoid matching undefined values.
+        const sameDay = new Date(app.date).toDateString() === currentDate.toDateString();
+        if (!sameDay || app.id === id) return false;
+
+        const matchById = techId ? (app.techId === techId || app.tech === techId) : false;
+        const matchByName = technicianName ? (app.tech === technicianName) : false;
+
+        return matchById || matchByName;
       });
+        console.log('appointmentsOnCurrentDay for', currentDate.toDateString(), appointmentsOnCurrentDay.map(a=>({id:a.id,startTime:a.startTime,tech:a.tech,techId:a.techId,expectedTime: a.details?.expectedTime})));
 
       if (isSameDay) {
         // Calculate the available slots on the current day
@@ -349,6 +369,10 @@ function AppointmentsPage() {
   };
 
   const checkNextDayOverlap = async (nextDay, remainingSlots, techId) => {
+    // `techId` may be either an id or a technician name (caller may pass techId || tech).
+    // Determine whether it's an id known in the `technicians` list.
+    const hasId = technicians.some(t => t.id === techId);
+    const technicianName = hasId ? technicians.find(t => t.id === techId)?.name : techId;
     const q = query(collection(firestore, appointmentsCollectionName), where('date', '==', nextDay.toDateString()));
     const querySnapshot = await getDocs(q);
 
@@ -361,8 +385,11 @@ function AppointmentsPage() {
     const spanEndIndex = Math.min(remainingSlots, timeSlots.length);
 
     for (let app of appointmentsOnNextDay) {
-      // Support both old (tech) and new (techId) format
-      if (app.techId === techId || app.tech === techId) {
+      // Match by id only when we have a valid id; otherwise match by name.
+      const matchById = hasId ? (app.techId === techId || app.tech === techId) : false;
+      const matchByName = technicianName ? (app.tech === technicianName) : false;
+
+      if (matchById || matchByName) {
         const existingStartIndex = timeSlots.indexOf(app.startTime);
         const existingEndIndex = existingStartIndex + app.details.expectedTime;
 
