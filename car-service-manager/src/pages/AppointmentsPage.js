@@ -171,7 +171,16 @@ function AppointmentsPage() {
       return;
     }
 
-    const sameDayOverlap = checkOverlap(newAppointment);
+    // Clean the appointment: remove tech field if we have a techId (migrate to new format)
+    let appointmentToSave = { ...newAppointment };
+    
+    // For new appointments, delete the tech field completely
+    if (!newAppointment.id && appointmentToSave.tech !== undefined) {
+      delete appointmentToSave.tech;
+    }
+    // For existing appointments, we'll handle tech field deletion separately using deleteField()
+
+    const sameDayOverlap = checkOverlap(appointmentToSave);
 
     if (sameDayOverlap) {
       alert('This appointment overlaps with an existing appointment for this technician.');
@@ -180,16 +189,16 @@ function AppointmentsPage() {
 
     // Determine if the appointment spans multiple days
     const workdayEndIndex = timeSlots.indexOf(endOfWorkDay);
-    const startTimeIndex = timeSlots.indexOf(newAppointment.startTime);
-    const totalSlotsNeeded = newAppointment.details.expectedTime;
+    const startTimeIndex = timeSlots.indexOf(appointmentToSave.startTime);
+    const totalSlotsNeeded = appointmentToSave.details.expectedTime;
 
     const availableSlotsToday = workdayEndIndex - startTimeIndex;
 
     if (totalSlotsNeeded > availableSlotsToday) {
       // Handle multi-day appointments
       const remainingSlots = totalSlotsNeeded - availableSlotsToday;
-      const nextDay = getNextWorkingDay(new Date(newAppointment.date));
-      const nextDayOverlap = await checkNextDayOverlap(nextDay, remainingSlots, newAppointment.techId || newAppointment.tech);
+      const nextDay = getNextWorkingDay(new Date(appointmentToSave.date));
+      const nextDayOverlap = await checkNextDayOverlap(nextDay, remainingSlots, appointmentToSave.techId);
 
       if (nextDayOverlap) {
         alert('The appointment would overlap with an existing appointment on the next working day.');
@@ -198,74 +207,81 @@ function AppointmentsPage() {
 
       // Split the appointment into two parts (today and next working day)
       const updatedAppointment = {
-        ...newAppointment,
+        ...appointmentToSave,
         details: {
-          ...newAppointment.details,
+          ...appointmentToSave.details,
           expectedTime: availableSlotsToday,
         },
       };
 
       if (updatedAppointment.id) {
         const appointmentRef = doc(firestore, appointmentsCollectionName, updatedAppointment.id);
-        // When updating, explicitly delete the old 'tech' field if techId exists to avoid duplicates
+        // For existing appointments, convert tech: undefined to deleteField()
         const updateData = { ...updatedAppointment };
-        if (updatedAppointment.techId) {
+        if (updatedAppointment.tech === undefined) {
           updateData.tech = deleteField();
         }
         await updateDoc(appointmentRef, updateData);
       } else {
-        const docRef = await addDoc(collection(firestore, appointmentsCollectionName), updatedAppointment);
+        // For new appointments, ensure tech field is not included
+        const dataToAdd = { ...updatedAppointment };
+        delete dataToAdd.tech;
+        const docRef = await addDoc(collection(firestore, appointmentsCollectionName), dataToAdd);
         updatedAppointment.id = docRef.id;
       }
 
       if (remainingSlots > 0) {
         const nextDayAppointment = {
-          ...newAppointment,
+          ...appointmentToSave,
           date: nextDay.toDateString(),
           startTime: workdayStart,
           details: {
-            ...newAppointment.details,
+            ...appointmentToSave.details,
             expectedTime: remainingSlots,
           },
         };
-
+        // Ensure tech field is not included for new appointments
+        delete nextDayAppointment.tech;
         await addDoc(collection(firestore, appointmentsCollectionName), nextDayAppointment);
       }
     } else {
       // Save normally if it doesn't span into the next day
-      if (newAppointment.id) {
-        const appointmentRef = doc(firestore, appointmentsCollectionName, newAppointment.id);
-        // When updating, explicitly delete the old 'tech' field if techId exists to avoid duplicates
-        const updateData = { ...newAppointment };
-        if (newAppointment.techId) {
+      if (appointmentToSave.id) {
+        const appointmentRef = doc(firestore, appointmentsCollectionName, appointmentToSave.id);
+        // For existing appointments, convert tech: undefined to deleteField()
+        const updateData = { ...appointmentToSave };
+        if (appointmentToSave.tech === undefined) {
           updateData.tech = deleteField();
         }
         await updateDoc(appointmentRef, updateData);
       } else {
-        const docRef = await addDoc(collection(firestore, appointmentsCollectionName), newAppointment);
-        newAppointment.id = docRef.id;
+        // For new appointments, ensure tech field is not included
+        const dataToAdd = { ...appointmentToSave };
+        delete dataToAdd.tech;
+        const docRef = await addDoc(collection(firestore, appointmentsCollectionName), dataToAdd);
+        appointmentToSave.id = docRef.id;
       }
     }
 
     // Update the associated account information
-    const accountRef = doc(firestore, accountsCollectionName, newAppointment.details.vehicleReg);
+    const accountRef = doc(firestore, accountsCollectionName, appointmentToSave.details.vehicleReg);
     const accountData = {
-      vehicleReg: newAppointment.details.vehicleReg,
-      customerName: newAppointment.details.customerName,
-      customerPhone: newAppointment.details.customerPhone,
-      vehicleMake: newAppointment.details.vehicleMake,
+      vehicleReg: appointmentToSave.details.vehicleReg,
+      customerName: appointmentToSave.details.customerName,
+      customerPhone: appointmentToSave.details.customerPhone,
+      vehicleMake: appointmentToSave.details.vehicleMake,
     };
 
     await setDoc(accountRef, accountData, { merge: true });
 
     setAppointments((prev) => {
-      const existingAppointmentIndex = prev.findIndex(app => app.id === newAppointment.id);
+      const existingAppointmentIndex = prev.findIndex(app => app.id === appointmentToSave.id);
       if (existingAppointmentIndex !== -1) {
         const updatedAppointments = [...prev];
-        updatedAppointments[existingAppointmentIndex] = newAppointment;
+        updatedAppointments[existingAppointmentIndex] = appointmentToSave;
         return updatedAppointments;
       }
-      return [...prev, newAppointment];
+      return [...prev, appointmentToSave];
     });
 
     setIsModalOpen(false);
@@ -274,43 +290,38 @@ function AppointmentsPage() {
 
 
   const checkOverlap = (newAppointment) => {
-    const { startTime, details, techId, date, id, tech } = newAppointment; // Get the appointment ID and use techId
+    const { startTime, details, techId, date, id, tech } = newAppointment;
     // Resolve technician name: prefer lookup by techId, otherwise fall back to the appointment's `tech` field
     const technicianFromId = techId ? technicians.find(t => t.id === techId)?.name : undefined;
     const technicianName = technicianFromId || tech || undefined;
-      // Debug logging to help track false-positive overlaps
-      console.log('checkOverlap called for:', {
-        id,
-        startTime,
-        expectedTime: details && details.expectedTime,
-        techId,
-        technicianName,
-        date,
-      });
+    
     const startIndex = timeSlots.indexOf(startTime);
     const appointmentDate = new Date(date);
     const totalSlotsNeeded = details.expectedTime;
 
     let remainingSlots = totalSlotsNeeded;
-    let currentDate = new Date(appointmentDate); // Use a copy of the date
-    let iterationCount = 0; // Safeguard to prevent infinite loop
+    let currentDate = new Date(appointmentDate);
+    let iterationCount = 0;
 
     // Helper function to check overlap for a specific day
     const checkDayOverlap = (currentDate, startIndex, remainingSlots) => {
       const isSameDay = currentDate.toDateString() === appointmentDate.toDateString();
       const appointmentsOnCurrentDay = appointments.filter(app => {
-        // Exclude the current appointment by checking the ID, support both old (tech) and new (techId/name) formats
-        // Only compare a field when the identifier is available to avoid matching undefined values.
+        // Exclude the current appointment by ID first
+        if (app.id === id) return false;
+        
+        // Only check same day appointments
         const sameDay = new Date(app.date).toDateString() === currentDate.toDateString();
-        if (!sameDay || app.id === id) return false;
+        if (!sameDay) return false;
 
+        // Match by ID: either app.techId or app.tech equals the new appointment's techId
         const matchById = techId ? (app.techId === techId || app.tech === techId) : false;
+        
+        // Match by name: app.tech equals the resolved technician name
         const matchByName = technicianName ? (app.tech === technicianName) : false;
 
         return matchById || matchByName;
       });
-        console.log('appointmentsOnCurrentDay for', currentDate.toDateString(), appointmentsOnCurrentDay.map(a=>({id:a.id,startTime:a.startTime,tech:a.tech,techId:a.techId,expectedTime: a.details?.expectedTime})));
-
       if (isSameDay) {
         // Calculate the available slots on the current day
         const availableSlotsToday = timeSlots.length - startIndex;

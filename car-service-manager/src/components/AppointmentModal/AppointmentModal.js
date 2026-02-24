@@ -349,13 +349,30 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     }
 
     if (onSave) {
-      // When saving, set techId but clear the old tech field to avoid duplicates
+      // When saving, ensure techId is set; only clear tech field for existing appointments
+      let finalTechId = appointment.techId;
+      
+      // If we don't have a techId, try to look it up from the tech field (for old appointments)
+      if (!finalTechId && appointment.tech) {
+        // Look up the technician ID by name
+        const techByName = technicians.find(t => t.name === appointment.tech);
+        finalTechId = techByName ? techByName.id : appointment.tech;
+      }
+      
       const appointmentToSave = {
         ...appointment,
-        techId: appointment.techId || appointment.tech, // Ensure techId is set
-        tech: undefined, // Remove old tech name field to prevent conflicts
+        techId: finalTechId, // Use the looked-up or existing techId
         details: formDataToSave,
       };
+      
+      // Only set tech: undefined for existing appointments to trigger Firestore deletion
+      if (appointment.id) {
+        appointmentToSave.tech = undefined;
+      } else {
+        // For new appointments, remove the tech field completely to avoid Firestore errors
+        delete appointmentToSave.tech;
+      }
+      
       onSave(appointmentToSave);
     }
 
@@ -408,7 +425,6 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     const updatedAppointment = {
       ...appointment,
       techId: newTechnicianId, // Use technician ID instead of name
-      tech: undefined, // Remove old tech name to prevent duplicate display
       date: formattedDate, // Use the formatted date
       startTime: newTime,
     };
