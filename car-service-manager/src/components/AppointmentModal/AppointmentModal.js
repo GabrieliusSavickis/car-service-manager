@@ -349,10 +349,14 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     }
 
     if (onSave) {
-      onSave({
+      // When saving, set techId but clear the old tech field to avoid duplicates
+      const appointmentToSave = {
         ...appointment,
+        techId: appointment.techId || appointment.tech, // Ensure techId is set
+        tech: undefined, // Remove old tech name field to prevent conflicts
         details: formDataToSave,
-      });
+      };
+      onSave(appointmentToSave);
     }
 
     // Save updated mileage to the vehicle's account
@@ -404,6 +408,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     const updatedAppointment = {
       ...appointment,
       techId: newTechnicianId, // Use technician ID instead of name
+      tech: undefined, // Remove old tech name to prevent duplicate display
       date: formattedDate, // Use the formatted date
       startTime: newTime,
     };

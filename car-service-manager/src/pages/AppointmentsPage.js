@@ -3,7 +3,7 @@ import Header from '../components/Header/Header';
 import Calendar from '../components/Calendar/Calendar';
 import AppointmentModal from '../components/AppointmentModal/AppointmentModal';
 import { firestore } from '../firebase'; // Import Firestore
-import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, setDoc, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, setDoc, onSnapshot, getDocs, deleteField } from 'firebase/firestore';
 import DatePicker from '../components/DatePicker/DatePicker';
 import './AppointmentsPage.css';
 import { getTechnicians, clearTechniciansCache } from '../utils/technicianUtils';
@@ -207,7 +207,12 @@ function AppointmentsPage() {
 
       if (updatedAppointment.id) {
         const appointmentRef = doc(firestore, appointmentsCollectionName, updatedAppointment.id);
-        await updateDoc(appointmentRef, updatedAppointment);
+        // When updating, explicitly delete the old 'tech' field if techId exists to avoid duplicates
+        const updateData = { ...updatedAppointment };
+        if (updatedAppointment.techId) {
+          updateData.tech = deleteField();
+        }
+        await updateDoc(appointmentRef, updateData);
       } else {
         const docRef = await addDoc(collection(firestore, appointmentsCollectionName), updatedAppointment);
         updatedAppointment.id = docRef.id;
@@ -230,7 +235,12 @@ function AppointmentsPage() {
       // Save normally if it doesn't span into the next day
       if (newAppointment.id) {
         const appointmentRef = doc(firestore, appointmentsCollectionName, newAppointment.id);
-        await updateDoc(appointmentRef, newAppointment);
+        // When updating, explicitly delete the old 'tech' field if techId exists to avoid duplicates
+        const updateData = { ...newAppointment };
+        if (newAppointment.techId) {
+          updateData.tech = deleteField();
+        }
+        await updateDoc(appointmentRef, updateData);
       } else {
         const docRef = await addDoc(collection(firestore, appointmentsCollectionName), newAppointment);
         newAppointment.id = docRef.id;
