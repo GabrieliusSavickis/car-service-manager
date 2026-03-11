@@ -1,407 +1,852 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Container,
-  Grid,
+  Box,
+  Button,
   Card,
   CardContent,
-  Typography,
-  Box,
+  Container,
+  Grid,
+  MenuItem,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TextField,
-  Button,
-  ButtonGroup,
-  Avatar,
-  useTheme,
+  Typography,
 } from '@mui/material';
-import PersonIcon from '@mui/icons-material/Person';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { Line } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-} from 'chart.js';
-import { firestore } from '../firebase';
-import { collection, getDocs } from 'firebase/firestore';
 import Header from '../components/Header/Header';
 import './Analytics.css';
 import { getTechnicians } from '../utils/technicianUtils';
-import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
-import MenuItem from '@mui/material/MenuItem';
+import { firestore } from '../firebase';
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  where,
+} from 'firebase/firestore';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
+const padWeek = (value) => String(value).padStart(2, '0');
+
+const getISOWeekNumber = (dateValue) => {
+  const date = new Date(Date.UTC(dateValue.getFullYear(), dateValue.getMonth(), dateValue.getDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+};
+
+const buildWeekOptionsForCurrentYear = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const currentWeek = getISOWeekNumber(now);
+
+  return Array.from({ length: currentWeek }, (_, index) => {
+    const week = index + 1;
+    const value = `${year}-W${padWeek(week)}`;
+    return { value, label: value };
+  });
+};
+
+const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const numericFields = ['hours', 'partsCost', 'partsSold', 'labour', 'total', 'vat'];
+
+const currencyFormatter = new Intl.NumberFormat('en-IE', {
+  style: 'currency',
+  currency: 'EUR',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+const toNumber = (value) => Number(value) || 0;
+
+const getTempId = () => `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const createEmptyRecord = (selectedWeek, defaultTechnicianId = '') => ({
+  id: '',
+  tempId: getTempId(),
+  week: selectedWeek,
+  day: '',
+  vehicleReg: '',
+  vehicleMake: '',
+  technicianId: defaultTechnicianId,
+  technicianName: '',
+  hours: '',
+  invoiceType: 'VAT',
+  customerType: 'P',
+  partsCost: '',
+  partsSold: '',
+  labour: '',
+  total: '',
+  vat: '',
+  totalInclVat: '0',
+  isNew: true,
+});
+
+const normalizeRecordFromDb = (docData, id) => ({
+  id,
+  tempId: '',
+  week: docData.week || '',
+  day: docData.day || '',
+  vehicleReg: docData.vehicleReg || '',
+  vehicleMake: docData.vehicleMake || '',
+  technicianId: docData.technicianId || '',
+  technicianName: docData.technicianName || '',
+  hours: String(docData.hours ?? ''),
+  invoiceType: docData.invoiceType || 'VAT',
+  customerType: docData.customerType || 'P',
+  partsCost: String(docData.partsCost ?? ''),
+  partsSold: String(docData.partsSold ?? ''),
+  labour: String(docData.labour ?? ''),
+  total: String(docData.total ?? ''),
+  vat: String(docData.vat ?? ''),
+  totalInclVat: String(docData.totalInclVat ?? 0),
+  isNew: false,
+});
+
+const getRowKey = (row) => row.id || row.tempId;
+
+const calculateSummary = (records, hourlyRate) => {
+  const totals = records.reduce(
+    (acc, record) => {
+      const hours = toNumber(record.hours);
+      const partsCost = toNumber(record.partsCost);
+      const partsSold = toNumber(record.partsSold);
+      const labourSold = toNumber(record.labour);
+      const totalInclVat = toNumber(record.totalInclVat);
+      const vat = toNumber(record.vat);
+
+      acc.partsCost += partsCost;
+      acc.partsSold += partsSold;
+      acc.labourSold += labourSold;
+      acc.totalInvoices += totalInclVat;
+      acc.vat += vat;
+      acc.jobs += 1;
+      acc.hours += hours;
+      return acc;
+    },
+    {
+      partsCost: 0,
+      partsSold: 0,
+      labourSold: 0,
+      totalInvoices: 0,
+      vat: 0,
+      jobs: 0,
+      hours: 0,
+    }
+  );
+
+  const labourCost = totals.hours * hourlyRate;
+
+  return {
+    partsCost: totals.partsCost,
+    labourCost,
+    partsSold: totals.partsSold,
+    labourSold: totals.labourSold,
+    partsProfit: totals.partsSold - totals.partsCost,
+    labourProfit: totals.labourSold - labourCost,
+    totalInvoices: totals.totalInvoices,
+    vat: totals.vat,
+    jobs: totals.jobs,
+    hours: totals.hours,
+  };
+};
 
 const Analytics = () => {
-  const now = new Date();
-  const defaultStart = new Date();
-  defaultStart.setDate(now.getDate() - 6); // last 7 days
+  const locationSuffix = useMemo(() => {
+    const hostname = window.location.hostname;
+    if (hostname.includes('asgennislive.ie')) return '_ennis';
+    if (hostname.includes('asglive.ie')) return '';
+    return '';
+  }, []);
+  const locationKey = locationSuffix === '_ennis' ? 'ennis' : 'main';
 
-  const [startDate, setStartDate] = useState(defaultStart);
-  const [endDate, setEndDate] = useState(now);
-  const [chartData, setChartData] = useState({ labels: [], datasets: [] });
-  const [summary, setSummary] = useState({ week: 0, month: 0, year: 0 });
-  const [appointmentsCount, setAppointmentsCount] = useState(0);
-  const [totalHours, setTotalHours] = useState(0);
-  const theme = useTheme();
-  const [techList, setTechList] = useState([]);
-  const [selectedTech, setSelectedTech] = useState('All');
-  const [techMap, setTechMap] = useState({});
-  const [rangeDialogOpen, setRangeDialogOpen] = useState(false);
+  const recordsCollectionName = `manual_weekly_appointments${locationSuffix}`;
+  const settingsDocRef = useMemo(() => doc(firestore, 'analytics_settings', locationKey), [locationKey]);
+  const weekOptions = useMemo(() => buildWeekOptionsForCurrentYear(), []);
 
-  // Determine location suffix like previous pages
-  const hostname = window.location.hostname;
-  let locationSuffix = '';
-  if (hostname.includes('asgennislive.ie')) {
-    locationSuffix = '_ennis';
-  } else if (hostname.includes('asglive.ie')) {
-    locationSuffix = '';
-  }
-  const appointmentsCollectionName = 'appointments' + locationSuffix;
+  const [selectedWeek, setSelectedWeek] = useState(() => weekOptions[weekOptions.length - 1]?.value || '');
+  const [hourlyLabourCost, setHourlyLabourCost] = useState(35);
+  const [hourlyLabourCostInput, setHourlyLabourCostInput] = useState('35');
+  const [isSavingHourlyCost, setIsSavingHourlyCost] = useState(false);
+  const [hourlyCostMessage, setHourlyCostMessage] = useState('');
+  const [mechanics, setMechanics] = useState([]);
+  const [selectedMechanicId, setSelectedMechanicId] = useState('all');
+  const [savedRecords, setSavedRecords] = useState([]);
+  const [isLoadingRecords, setIsLoadingRecords] = useState(false);
+  const [yearlyRecords, setYearlyRecords] = useState([]);
+  const [isLoadingYearly, setIsLoadingYearly] = useState(false);
+  const [summaryView, setSummaryView] = useState('weekly');
+  const [rowActionMessage, setRowActionMessage] = useState('');
+  const [savingRowKey, setSavingRowKey] = useState('');
+
+  const selectedYear = useMemo(() => {
+    const yearPart = selectedWeek?.split('-W')[0];
+    return yearPart || String(new Date().getFullYear());
+  }, [selectedWeek]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      const startOfDay = new Date(startDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(endDate);
-      endOfDay.setHours(23, 59, 59, 999);
-
-      // Fetch all appointments and filter client-side to avoid relying on string range queries
-      const querySnapshot = await getDocs(collection(firestore, appointmentsCollectionName));
-
-        // Prepare labels for each day in range and accumulate minutes
-        const labels = [];
-        const dayMap = {};
-        for (let d = new Date(startOfDay); d <= endOfDay; d.setDate(d.getDate() + 1)) {
-          const label = new Date(d).toDateString();
-          labels.push(label);
-          dayMap[label] = 0; // minutes
-        }
-
-        // Helper to parse appointment date robustly
-        const parseApptDate = (appt) => {
-          if (!appt) return null;
-          if (appt.date) {
-            const d = new Date(appt.date);
-            if (!isNaN(d)) return d;
-            const asNum = Number(appt.date);
-            if (!isNaN(asNum)) return new Date(asNum);
-          }
-          if (appt.formattedDateTime) {
-            const d = new Date(appt.formattedDateTime);
-            if (!isNaN(d)) return d;
-          }
-          return null;
-        };
-
-        const appointments = [];
-        querySnapshot.forEach((doc) => {
-          appointments.push({ id: doc.id, ...doc.data() });
-        });
-
-        const selectedTechId = selectedTech === 'All' ? null : techMap[selectedTech] || null;
-
-        const appointmentMatchesTech = (appointment) => {
-          if (selectedTech === 'All') return true;
-          // Match appointment-level fields
-          if (appointment.tech && appointment.tech === selectedTech) return true;
-          if (appointment.techId && String(appointment.techId) === String(selectedTechId)) return true;
-          // Check tasks for matching completedBy or completedById
-          const { tasks } = appointment.details || {};
-          if (tasks && Array.isArray(tasks)) {
-            for (const t of tasks) {
-              if (!t) continue;
-              if (t.completedBy && t.completedBy === selectedTech) return true;
-              if (t.completedById && String(t.completedById) === String(selectedTechId)) return true;
-              // sometimes completedBy may store an id
-              if (selectedTechId && String(t.completedBy) === String(selectedTechId)) return true;
-            }
-          }
-          return false;
-        };
-
-        appointments.forEach((appointment) => {
-          const apptDateObj = parseApptDate(appointment);
-          if (!apptDateObj) return;
-          const apptDateStr = apptDateObj.toDateString();
-          if (apptDateObj >= startOfDay && apptDateObj <= endOfDay && dayMap[apptDateStr] !== undefined) {
-            const { tasks } = appointment.details || {};
-            if (tasks) {
-              tasks.forEach((task) => {
-                if (task.completed) {
-                  // If technician filter is applied, only accumulate for that technician
-                  if (appointmentMatchesTech(appointment) || (task.completedBy && (task.completedBy === selectedTech || String(task.completedBy) === String(selectedTechId)))) {
-                    dayMap[apptDateStr] += (task.timeSpent || 0); // minutes
-                  }
-                }
-              });
-            }
-          }
-        });
-
-      const dataPoints = labels.map((l) => +(dayMap[l] / 60).toFixed(2)); // hours
-
-      const totalMinutes = Object.values(dayMap).reduce((s, v) => s + v, 0);
-      const totalHrs = +(totalMinutes / 60).toFixed(2);
-
-      setChartData({
-        labels,
-        datasets: [
-          {
-            label: 'Technician Hours (hrs)',
-            data: dataPoints,
-            borderColor: theme.palette.primary.main,
-            backgroundColor: 'rgba(25,118,210,0.12)',
-            tension: 0.3,
-            pointRadius: 4,
-          },
-        ],
-      });
-
-      // Compute appointments count in range (respecting parsed dates)
-      const apptsInRange = appointments.filter(a => {
-        const d = parseApptDate(a);
-        if (!d || d < startOfDay || d > endOfDay) return false;
-        if (selectedTech === 'All') return true;
-        // appointment-level matches
-        if (a.tech && a.tech === selectedTech) return true;
-        if (a.techId && String(a.techId) === String(selectedTechId)) return true;
-        // tasks-level matches
-        const { tasks } = a.details || {};
-        if (tasks && Array.isArray(tasks)) {
-          for (const t of tasks) {
-            if (!t) continue;
-            if (t.completedBy && (t.completedBy === selectedTech || String(t.completedBy) === String(selectedTechId))) return true;
-            if (t.completedById && String(t.completedById) === String(selectedTechId)) return true;
-          }
-        }
-        return false;
-      });
-      setAppointmentsCount(apptsInRange.length);
-      setTotalHours(totalHrs);
-
-      // Compute summary counts locally
-      const today = new Date();
-      const weekStart = new Date();
-      weekStart.setDate(today.getDate() - 7);
-      const monthStart = new Date();
-      monthStart.setMonth(today.getMonth() - 1);
-      const yearStart = new Date();
-      yearStart.setFullYear(today.getFullYear() - 1);
-
-      const weekCount = appointments.filter(a => {
-        const d = parseApptDate(a);
-        return d && d >= weekStart && d <= today;
-      }).length;
-      const monthCount = appointments.filter(a => {
-        const d = parseApptDate(a);
-        return d && d >= monthStart && d <= today;
-      }).length;
-      const yearCount = appointments.filter(a => {
-        const d = parseApptDate(a);
-        return d && d >= yearStart && d <= today;
-      }).length;
-
-      setSummary({ week: weekCount, month: monthCount, year: yearCount });
-    };
-
-    fetchData();
-  }, [startDate, endDate, appointmentsCollectionName, selectedTech, techMap, theme]);
-
-  // Load available technicians for dropdown
-  useEffect(() => {
-    const loadTechs = async () => {
+    const loadMechanics = async () => {
       try {
-        const techs = await getTechnicians(locationSuffix);
-        const names = techs.map(t => t.name).filter(Boolean);
-        const map = {};
-        techs.forEach(t => {
-          if (t && t.name) map[t.name] = t.id;
-        });
-        setTechMap(map);
-        setTechList(['All', ...names]);
-      } catch (err) {
-        console.error('Failed to load technicians', err);
-        setTechList(['All']);
+        const fetchedTechnicians = await getTechnicians(locationSuffix);
+        const mapped = fetchedTechnicians
+          .filter((tech) => tech?.id && tech?.name)
+          .map((tech) => ({ id: tech.id, name: tech.name }));
+        setMechanics(mapped);
+      } catch (error) {
+        console.error('Error loading mechanics for analytics filters:', error);
+        setMechanics([]);
       }
     };
 
-    loadTechs();
+    loadMechanics();
   }, [locationSuffix]);
 
-  const numberOfDays = useMemo(() => {
-    const diff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
-    return diff > 0 ? diff : 1;
-  }, [startDate, endDate]);
+  useEffect(() => {
+    if (!selectedWeek) {
+      setSavedRecords([]);
+      return;
+    }
 
-  const avgHoursPerDay = useMemo(() => {
-    return +(totalHours / numberOfDays).toFixed(2);
-  }, [totalHours, numberOfDays]);
+    const loadSavedRecords = async () => {
+      try {
+        setIsLoadingRecords(true);
+        const recordsRef = collection(firestore, recordsCollectionName);
+        const recordsQuery = query(recordsRef, where('week', '==', selectedWeek));
+        const snapshot = await getDocs(recordsQuery);
 
-  const handlePreset = (days) => {
-    const newEnd = new Date();
-    const newStart = new Date();
-    newStart.setDate(newEnd.getDate() - (days - 1));
-    setStartDate(newStart);
-    setEndDate(newEnd);
+        const records = snapshot.docs.map((recordDoc) => normalizeRecordFromDb(recordDoc.data(), recordDoc.id));
+        records.sort((a, b) => daysOfWeek.indexOf(a.day) - daysOfWeek.indexOf(b.day));
+        setSavedRecords(records);
+      } catch (error) {
+        console.error('Failed to load saved manual records:', error);
+        setSavedRecords([]);
+      } finally {
+        setIsLoadingRecords(false);
+      }
+    };
+
+    loadSavedRecords();
+  }, [recordsCollectionName, selectedWeek]);
+
+  useEffect(() => {
+    if (!selectedYear) {
+      setYearlyRecords([]);
+      return;
+    }
+
+    const loadYearlyRecords = async () => {
+      try {
+        setIsLoadingYearly(true);
+        const recordsRef = collection(firestore, recordsCollectionName);
+        const recordsQuery = query(
+          recordsRef,
+          where('week', '>=', `${selectedYear}-W01`),
+          where('week', '<=', `${selectedYear}-W53`)
+        );
+        const snapshot = await getDocs(recordsQuery);
+
+        const records = snapshot.docs.map((recordDoc) => normalizeRecordFromDb(recordDoc.data(), recordDoc.id));
+        setYearlyRecords(records);
+      } catch (error) {
+        console.error('Failed to load yearly records:', error);
+        setYearlyRecords([]);
+      } finally {
+        setIsLoadingYearly(false);
+      }
+    };
+
+    loadYearlyRecords();
+  }, [recordsCollectionName, selectedYear]);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      settingsDocRef,
+      (snapshot) => {
+        const data = snapshot.data();
+        const numeric = Number(data?.hourlyLabourCost);
+        const cost = Number.isFinite(numeric) && numeric >= 0 ? numeric : 35;
+        setHourlyLabourCost(cost);
+        setHourlyLabourCostInput(String(cost));
+      },
+      (error) => {
+        console.error('Failed to load hourly labour cost settings:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [settingsDocRef]);
+
+  const handleHourlyLabourCostChange = (value) => {
+    if (value === '') {
+      setHourlyLabourCostInput('');
+      return;
+    }
+
+    if (/^\d*\.?\d*$/.test(value)) {
+      setHourlyLabourCostInput(value);
+    }
   };
 
-  const formattedRange = `${startDate.toLocaleDateString()} — ${endDate.toLocaleDateString()}`;
+  const handleSaveHourlyLabourCost = async () => {
+    const numeric = Number(hourlyLabourCostInput);
+    if (!Number.isFinite(numeric) || numeric < 0) {
+      setHourlyCostMessage('Enter a valid hourly labour cost.');
+      return;
+    }
 
-  const openRangeDialog = () => setRangeDialogOpen(true);
-  const closeRangeDialog = () => setRangeDialogOpen(false);
-  const applyRangeDialog = () => {
-    setRangeDialogOpen(false);
+    try {
+      setIsSavingHourlyCost(true);
+      setHourlyCostMessage('');
+      await setDoc(settingsDocRef, {
+        hourlyLabourCost: numeric,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      setHourlyLabourCost(numeric);
+      setHourlyCostMessage('Hourly cost saved for this location.');
+    } catch (error) {
+      console.error('Failed to save hourly labour cost:', error);
+      setHourlyCostMessage('Failed to save hourly cost. Please try again.');
+    } finally {
+      setIsSavingHourlyCost(false);
+    }
   };
+
+  const handleAddRecordRow = () => {
+    setRowActionMessage('');
+    const defaultTech = selectedMechanicId !== 'all' ? selectedMechanicId : mechanics[0]?.id || '';
+    const newRow = createEmptyRecord(selectedWeek, defaultTech);
+    setSavedRecords((prev) => [...prev, newRow]);
+  };
+
+  const handleRowChange = (rowKey, field, value) => {
+    setSavedRecords((prev) => prev.map((row) => {
+      if (getRowKey(row) !== rowKey) return row;
+
+      if (numericFields.includes(field)) {
+        if (!(value === '' || /^\d*\.?\d*$/.test(value))) return row;
+      }
+
+      const nextRow = { ...row, [field]: value };
+
+      if (field === 'technicianId') {
+        const tech = mechanics.find((m) => m.id === value);
+        nextRow.technicianName = tech?.name || '';
+      }
+
+      if (field === 'total' || field === 'vat') {
+        const totalValue = field === 'total' ? value : nextRow.total;
+        const vatValue = field === 'vat' ? value : nextRow.vat;
+        nextRow.totalInclVat = String(toNumber(totalValue) + toNumber(vatValue));
+      }
+
+      return nextRow;
+    }));
+  };
+
+  const handleSaveRow = async (row) => {
+    if (!row.day || !row.technicianId) {
+      setRowActionMessage('Each record needs Day and Mechanic before saving.');
+      return;
+    }
+
+    const selectedTechnician = mechanics.find((mechanic) => mechanic.id === row.technicianId);
+
+    const payload = {
+      week: selectedWeek,
+      day: row.day,
+      vehicleReg: (row.vehicleReg || '').trim(),
+      vehicleMake: (row.vehicleMake || '').trim(),
+      technicianId: row.technicianId,
+      technicianName: selectedTechnician?.name || row.technicianName || '',
+      hours: toNumber(row.hours),
+      invoiceType: row.invoiceType || 'VAT',
+      customerType: row.customerType || 'P',
+      partsCost: toNumber(row.partsCost),
+      partsSold: toNumber(row.partsSold),
+      labour: toNumber(row.labour),
+      total: toNumber(row.total),
+      vat: toNumber(row.vat),
+      totalInclVat: toNumber(row.total) + toNumber(row.vat),
+      hourlyLabourCost: toNumber(hourlyLabourCost),
+      updatedAt: serverTimestamp(),
+    };
+
+    const rowKey = getRowKey(row);
+
+    try {
+      setSavingRowKey(rowKey);
+      setRowActionMessage('');
+
+      if (row.id) {
+        await updateDoc(doc(firestore, recordsCollectionName, row.id), payload);
+        setSavedRecords((prev) => prev.map((item) => (
+          getRowKey(item) === rowKey
+            ? {
+                ...item,
+                ...row,
+                ...payload,
+                totalInclVat: String(payload.totalInclVat),
+                isNew: false,
+              }
+            : item
+        )));
+        setRowActionMessage('Record updated.');
+      } else {
+        const createdRef = await addDoc(collection(firestore, recordsCollectionName), {
+          ...payload,
+          createdAt: serverTimestamp(),
+        });
+
+        setSavedRecords((prev) => prev.map((item) => (
+          getRowKey(item) === rowKey
+            ? {
+                ...item,
+                id: createdRef.id,
+                tempId: '',
+                ...payload,
+                totalInclVat: String(payload.totalInclVat),
+                isNew: false,
+              }
+            : item
+        )));
+        setRowActionMessage('Record saved.');
+      }
+    } catch (error) {
+      console.error('Failed to save row:', error);
+      setRowActionMessage('Failed to save row. Please try again.');
+    } finally {
+      setSavingRowKey('');
+    }
+  };
+
+  const handleDeleteRow = async (row) => {
+    const confirmed = window.confirm('Delete this record?');
+    if (!confirmed) return;
+
+    const rowKey = getRowKey(row);
+
+    try {
+      setRowActionMessage('');
+
+      if (row.id) {
+        await deleteDoc(doc(firestore, recordsCollectionName, row.id));
+      }
+
+      setSavedRecords((prev) => prev.filter((item) => getRowKey(item) !== rowKey));
+      setRowActionMessage('Record deleted.');
+    } catch (error) {
+      console.error('Failed to delete row:', error);
+      setRowActionMessage('Failed to delete row. Please try again.');
+    }
+  };
+
+  const visibleRecords = useMemo(() => {
+    if (selectedMechanicId === 'all') return savedRecords;
+    return savedRecords.filter((record) => record.technicianId === selectedMechanicId);
+  }, [savedRecords, selectedMechanicId]);
+
+  const visibleYearlyRecords = useMemo(() => {
+    if (selectedMechanicId === 'all') return yearlyRecords;
+    return yearlyRecords.filter((record) => record.technicianId === selectedMechanicId);
+  }, [yearlyRecords, selectedMechanicId]);
+
+  const weeklySummary = useMemo(() => {
+    const hourlyRate = Number(hourlyLabourCost) || 0;
+    return calculateSummary(visibleRecords, hourlyRate);
+  }, [visibleRecords, hourlyLabourCost]);
+
+  const yearlySummary = useMemo(() => {
+    const hourlyRate = Number(hourlyLabourCost) || 0;
+    return calculateSummary(visibleYearlyRecords, hourlyRate);
+  }, [visibleYearlyRecords, hourlyLabourCost]);
+
+  const activeSummary = summaryView === 'weekly' ? weeklySummary : yearlySummary;
+  const isSummaryLoading = summaryView === 'yearly' ? isLoadingYearly : isLoadingRecords;
 
   return (
-    <div>
+    <div className="analytics-page-shell">
       <Header />
-      <Container maxWidth="lg">
-        <Box sx={{ my: 4 }}>
-          <h1>Analytics</h1>
-
-          <Grid container spacing={3}>
+      <Container maxWidth={false} sx={{ px: { xs: 2, md: 3, lg: 4 } }}>
+        <Box className="analytics-page" sx={{ my: 2 }}>
+          <Grid container spacing={3} className="analytics-filters-row">
             <Grid item xs={12} md={4}>
-                {/* KPI Gradient Variant: Blue */}
-                <Card className="kpi-card kpi-gradient kpi-gradient--blue">
+              <Card className="analytics-filter-card analytics-surface-card">
                 <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Avatar sx={{ bgcolor: theme.palette.primary.main }}>
-                      <PersonIcon />
-                    </Avatar>
-                    <Box>
-                      <Typography variant="subtitle2">Appointments</Typography>
-                      <Typography variant="h6">{appointmentsCount}</Typography>
-                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>in selected range</Typography>
-                    </Box>
-                  </Box>
+                  <Typography variant="subtitle2" className="analytics-filter-label">
+                    Week
+                  </Typography>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    value={selectedWeek}
+                    onChange={(event) => setSelectedWeek(event.target.value)}
+                  >
+                    {weekOptions.map((week) => (
+                      <MenuItem key={week.value} value={week.value}>{week.label}</MenuItem>
+                    ))}
+                  </TextField>
                 </CardContent>
               </Card>
             </Grid>
 
             <Grid item xs={12} md={4}>
-                {/* KPI Gradient Variant: Green */}
-                <Card className="kpi-card kpi-gradient kpi-gradient--green">
+              <Card className="analytics-filter-card analytics-surface-card">
                 <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.16)', color: '#fff' }}>
-                      <AccessTimeIcon />
-                    </Avatar>
-                    <Box>
-                      <Typography variant="subtitle2" sx={{ color: 'rgba(255,255,255,0.9)' }}>Total Hours</Typography>
-                      <Typography variant="h6" sx={{ color: '#fff' }}>{totalHours} hrs</Typography>
-                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.75)' }}>across selected technicians</Typography>
-                    </Box>
-                  </Box>
+                  <Typography variant="subtitle2" className="analytics-filter-label">
+                    Mechanic Filter
+                  </Typography>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    value={selectedMechanicId}
+                    onChange={(event) => setSelectedMechanicId(event.target.value)}
+                  >
+                    <MenuItem value="all">All mechanics</MenuItem>
+                    {mechanics.map((mechanic) => (
+                      <MenuItem key={mechanic.id} value={mechanic.id}>{mechanic.name}</MenuItem>
+                    ))}
+                  </TextField>
                 </CardContent>
               </Card>
             </Grid>
 
             <Grid item xs={12} md={4}>
-                {/* KPI Gradient Variant: Orange */}
-                <Card className="kpi-card kpi-gradient kpi-gradient--orange">
+              <Card className="analytics-filter-card analytics-surface-card">
                 <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.12)', color: '#fff' }}>
-                      <TrendingUpIcon />
-                    </Avatar>
-                    <Box>
-                      <Typography variant="subtitle2" sx={{ color: 'rgba(255,255,255,0.9)' }}>Avg / Day</Typography>
-                      <Typography variant="h6" sx={{ color: '#fff' }}>{avgHoursPerDay} hrs</Typography>
-                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.75)' }}>per technician per day</Typography>
-                    </Box>
+                  <Typography variant="subtitle2" className="analytics-filter-label">
+                    Hourly Labour Cost
+                  </Typography>
+                  <Box className="analytics-hourly-cost-row">
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="text"
+                      value={hourlyLabourCostInput}
+                      onChange={(event) => handleHourlyLabourCostChange(event.target.value)}
+                      inputProps={{ inputMode: 'decimal' }}
+                    />
+                    <Button
+                      className="analytics-primary-btn"
+                      variant="contained"
+                      size="small"
+                      disabled={isSavingHourlyCost}
+                      onClick={handleSaveHourlyLabourCost}
+                    >
+                      {isSavingHourlyCost ? 'Saving...' : 'Save'}
+                    </Button>
                   </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            <Grid item xs={12} md={8}>
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
-                    <Typography variant="h6">Technician Hours</Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <ButtonGroup variant="outlined" size="small" sx={{ mr: 1 }}>
-                        <Button onClick={() => handlePreset(7)}>7d</Button>
-                        <Button onClick={() => handlePreset(30)}>30d</Button>
-                        <Button onClick={() => handlePreset(90)}>90d</Button>
-                      </ButtonGroup>
-
-                      <TextField
-                        select
-                        value={selectedTech}
-                        size="small"
-                        onChange={(e) => setSelectedTech(e.target.value)}
-                        sx={{ width: 160, mr: 1 }}
-                      >
-                        {techList.map((tech) => (
-                          <MenuItem key={tech} value={tech}>{tech}</MenuItem>
-                        ))}
-                      </TextField>
-
-                      <Button variant="outlined" size="small" onClick={openRangeDialog}>{formattedRange}</Button>
-                    </Box>
-                  </Box>
-                  <Box className="chart-wrapper">
-                    <Line data={chartData} options={{ responsive: true, maintainAspectRatio: false }} />
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6">Summary</Typography>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
-                    <Typography>Appointments (last 7 days): <strong>{summary.week}</strong></Typography>
-                    <Typography>Appointments (last 30 days): <strong>{summary.month}</strong></Typography>
-                    <Typography>Appointments (last 12 months): <strong>{summary.year}</strong></Typography>
-                  </Box>
+                  {hourlyCostMessage && (
+                    <Typography variant="caption" className="analytics-hourly-cost-message">
+                      {hourlyCostMessage}
+                    </Typography>
+                  )}
                 </CardContent>
               </Card>
             </Grid>
           </Grid>
+
+          <Card className="analytics-summary-card analytics-surface-card">
+            <CardContent>
+              <Box className="analytics-summary-header">
+                <Box>
+                  <Typography variant="h6" className="analytics-form-title">
+                    Summary Overview
+                  </Typography>
+                  <Typography variant="body2" className="analytics-section-text">
+                    Switch between Weekly and Yearly totals.
+                  </Typography>
+                </Box>
+                <Box className="analytics-summary-toggle">
+                  <Button
+                    variant={summaryView === 'weekly' ? 'contained' : 'outlined'}
+                    className={summaryView === 'weekly' ? 'analytics-primary-btn' : 'analytics-secondary-btn'}
+                    onClick={() => setSummaryView('weekly')}
+                    size="small"
+                  >
+                    Weekly
+                  </Button>
+                  <Button
+                    variant={summaryView === 'yearly' ? 'contained' : 'outlined'}
+                    className={summaryView === 'yearly' ? 'analytics-primary-btn' : 'analytics-secondary-btn'}
+                    onClick={() => setSummaryView('yearly')}
+                    size="small"
+                  >
+                    Yearly
+                  </Button>
+                </Box>
+              </Box>
+
+              {isSummaryLoading ? (
+                <Typography variant="body2">Loading summary...</Typography>
+              ) : (
+                <Grid container spacing={2} className="analytics-summary-grid">
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box className="analytics-summary-item">
+                      <Typography className="analytics-summary-label">Parts Cost</Typography>
+                      <Typography className="analytics-summary-value">{currencyFormatter.format(activeSummary.partsCost)}</Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box className="analytics-summary-item">
+                      <Typography className="analytics-summary-label">Labour Cost</Typography>
+                      <Typography className="analytics-summary-value">{currencyFormatter.format(activeSummary.labourCost)}</Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box className="analytics-summary-item">
+                      <Typography className="analytics-summary-label">Parts Sold</Typography>
+                      <Typography className="analytics-summary-value">{currencyFormatter.format(activeSummary.partsSold)}</Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box className="analytics-summary-item">
+                      <Typography className="analytics-summary-label">Labour Sold</Typography>
+                      <Typography className="analytics-summary-value">{currencyFormatter.format(activeSummary.labourSold)}</Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box className="analytics-summary-item">
+                      <Typography className="analytics-summary-label">Parts Profit</Typography>
+                      <Typography className="analytics-summary-value">{currencyFormatter.format(activeSummary.partsProfit)}</Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box className="analytics-summary-item">
+                      <Typography className="analytics-summary-label">Labour Profit</Typography>
+                      <Typography className="analytics-summary-value">{currencyFormatter.format(activeSummary.labourProfit)}</Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box className="analytics-summary-item">
+                      <Typography className="analytics-summary-label">Total Invoice Amounts</Typography>
+                      <Typography className="analytics-summary-value">{currencyFormatter.format(activeSummary.totalInvoices)}</Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box className="analytics-summary-item">
+                      <Typography className="analytics-summary-label">Total VAT</Typography>
+                      <Typography className="analytics-summary-value">{currencyFormatter.format(activeSummary.vat)}</Typography>
+                    </Box>
+                  </Grid>
+                </Grid>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="analytics-table-card analytics-surface-card">
+            <CardContent>
+              <Box className="analytics-table-header-row">
+                <Box>
+                  <Typography variant="h6" className="analytics-form-title">
+                    Weekly Records ({selectedWeek})
+                  </Typography>
+                  <Typography variant="body2" className="analytics-section-text">
+                    Add rows manually and save each record.
+                  </Typography>
+                </Box>
+                <Button className="analytics-primary-btn" variant="contained" onClick={handleAddRecordRow}>
+                  Add Record
+                </Button>
+              </Box>
+
+              {isLoadingRecords ? (
+                <Typography variant="body2">Loading records...</Typography>
+              ) : visibleRecords.length === 0 ? (
+                <Typography variant="body2">No records saved for this filter yet. Click Add Record to start.</Typography>
+              ) : (
+                <TableContainer className="analytics-table-container">
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Day</TableCell>
+                        <TableCell>Make</TableCell>
+                        <TableCell>Reg</TableCell>
+                        <TableCell>Mechanic</TableCell>
+                        <TableCell align="right">Hours</TableCell>
+                        <TableCell>Invoice</TableCell>
+                        <TableCell>Cust.</TableCell>
+                        <TableCell align="right">Parts Cost</TableCell>
+                        <TableCell align="right">Parts Sold</TableCell>
+                        <TableCell align="right">Labour</TableCell>
+                        <TableCell align="right">Total</TableCell>
+                        <TableCell align="right">VAT</TableCell>
+                        <TableCell align="right">Total incl. VAT</TableCell>
+                        <TableCell align="right">Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {visibleRecords.map((record) => {
+                        const rowKey = getRowKey(record);
+                        const isSavingThisRow = savingRowKey === rowKey;
+
+                        return (
+                          <TableRow key={rowKey} hover>
+                            <TableCell>
+                              <TextField
+                                select
+                                size="small"
+                                value={record.day}
+                                onChange={(event) => handleRowChange(rowKey, 'day', event.target.value)}
+                                className="analytics-table-field"
+                              >
+                                {daysOfWeek.map((day) => (
+                                  <MenuItem key={day} value={day}>{day}</MenuItem>
+                                ))}
+                              </TextField>
+                            </TableCell>
+                            <TableCell>
+                              <TextField
+                                size="small"
+                                value={record.vehicleMake}
+                                onChange={(event) => handleRowChange(rowKey, 'vehicleMake', event.target.value)}
+                                className="analytics-table-field"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <TextField
+                                size="small"
+                                value={record.vehicleReg}
+                                onChange={(event) => handleRowChange(rowKey, 'vehicleReg', event.target.value.toUpperCase())}
+                                className="analytics-table-field analytics-table-field--reg"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <TextField
+                                select
+                                size="small"
+                                value={record.technicianId}
+                                onChange={(event) => handleRowChange(rowKey, 'technicianId', event.target.value)}
+                                className="analytics-table-field"
+                              >
+                                {mechanics.map((mechanic) => (
+                                  <MenuItem key={mechanic.id} value={mechanic.id}>{mechanic.name}</MenuItem>
+                                ))}
+                              </TextField>
+                            </TableCell>
+                            <TableCell align="right">
+                              <TextField
+                                size="small"
+                                value={record.hours}
+                                onChange={(event) => handleRowChange(rowKey, 'hours', event.target.value)}
+                                className="analytics-table-field analytics-table-field--num analytics-table-field--hours"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <TextField
+                                select
+                                size="small"
+                                value={record.invoiceType}
+                                onChange={(event) => handleRowChange(rowKey, 'invoiceType', event.target.value)}
+                                className="analytics-table-field"
+                              >
+                                <MenuItem value="VAT">VAT</MenuItem>
+                                <MenuItem value="CASH">CASH</MenuItem>
+                              </TextField>
+                            </TableCell>
+                            <TableCell>
+                              <TextField
+                                select
+                                size="small"
+                                value={record.customerType}
+                                onChange={(event) => handleRowChange(rowKey, 'customerType', event.target.value)}
+                                className="analytics-table-field"
+                              >
+                                <MenuItem value="P">P</MenuItem>
+                                <MenuItem value="I">I</MenuItem>
+                              </TextField>
+                            </TableCell>
+                            <TableCell align="right">
+                              <TextField
+                                size="small"
+                                value={record.partsCost}
+                                onChange={(event) => handleRowChange(rowKey, 'partsCost', event.target.value)}
+                                className="analytics-table-field analytics-table-field--num"
+                              />
+                            </TableCell>
+                            <TableCell align="right">
+                              <TextField
+                                size="small"
+                                value={record.partsSold}
+                                onChange={(event) => handleRowChange(rowKey, 'partsSold', event.target.value)}
+                                className="analytics-table-field analytics-table-field--num"
+                              />
+                            </TableCell>
+                            <TableCell align="right">
+                              <TextField
+                                size="small"
+                                value={record.labour}
+                                onChange={(event) => handleRowChange(rowKey, 'labour', event.target.value)}
+                                className="analytics-table-field analytics-table-field--num"
+                              />
+                            </TableCell>
+                            <TableCell align="right">
+                              <TextField
+                                size="small"
+                                value={record.total}
+                                onChange={(event) => handleRowChange(rowKey, 'total', event.target.value)}
+                                className="analytics-table-field analytics-table-field--num"
+                              />
+                            </TableCell>
+                            <TableCell align="right">
+                              <TextField
+                                size="small"
+                                value={record.vat}
+                                onChange={(event) => handleRowChange(rowKey, 'vat', event.target.value)}
+                                className="analytics-table-field analytics-table-field--num"
+                              />
+                            </TableCell>
+                            <TableCell align="right" className="analytics-total-cell">
+                              {currencyFormatter.format(toNumber(record.totalInclVat))}
+                            </TableCell>
+                            <TableCell align="right">
+                              <Box className="analytics-row-actions">
+                                <Button
+                                  size="small"
+                                  variant="text"
+                                  onClick={() => handleSaveRow(record)}
+                                  disabled={isSavingThisRow}
+                                >
+                                  {isSavingThisRow ? 'Saving...' : 'Save'}
+                                </Button>
+                                <Button
+                                  className="analytics-delete-btn"
+                                  size="small"
+                                  variant="text"
+                                  onClick={() => handleDeleteRow(record)}
+                                  disabled={isSavingThisRow}
+                                >
+                                  Delete
+                                </Button>
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+
+              {rowActionMessage && (
+                <Typography variant="body2" className="analytics-row-message">
+                  {rowActionMessage}
+                </Typography>
+              )}
+            </CardContent>
+          </Card>
         </Box>
       </Container>
-
-      <Dialog open={rangeDialogOpen} onClose={closeRangeDialog}>
-        <DialogTitle>Select Date Range</DialogTitle>
-        <DialogContent>
-          <LocalizationProvider dateAdapter={AdapterDateFns}>
-            <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-              <DatePicker
-                label="Start"
-                value={startDate}
-                onChange={(newValue) => {
-                  if (newValue) setStartDate(newValue);
-                }}
-                renderInput={(params) => <TextField {...params} />}
-              />
-              <DatePicker
-                label="End"
-                value={endDate}
-                onChange={(newValue) => {
-                  if (newValue) setEndDate(newValue);
-                }}
-                renderInput={(params) => <TextField {...params} />}
-              />
-            </Box>
-          </LocalizationProvider>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeRangeDialog}>Cancel</Button>
-          <Button onClick={applyRangeDialog} variant="contained">Apply</Button>
-        </DialogActions>
-      </Dialog>
     </div>
   );
 };

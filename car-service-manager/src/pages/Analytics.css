@@ -1,50 +1,289 @@
-.kpi-card {
-  border-radius: 8px;
-  padding: 12px;
-  box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+.analytics-page-shell {
+  min-height: 100vh;
+  background: #f4f7fc;
 }
 
-/* Gradient KPI shared styles */
-.kpi-gradient {
-  color: #fff;
-  box-shadow: 0 8px 24px rgba(16,24,40,0.06);
-  overflow: hidden;
+.analytics-page {
+  min-height: 60vh;
+  padding: 20px 0;
 }
 
-.kpi-gradient .MuiAvatar-root {
-  background: rgba(255,255,255,0.12) !important;
-  color: #fff !important;
+.analytics-filter-card {
+  height: 100%;
 }
 
-/* Blue */
-.kpi-gradient--blue { background: linear-gradient(135deg, #1565c0 0%, #42a5f5 100%); }
-
-/* Green */
-.kpi-gradient--green { background: linear-gradient(135deg, #2e7d32 0%, #60ad5e 100%); }
-
-/* Orange */
-.kpi-gradient--orange { background: linear-gradient(135deg, #ef6c00 0%, #ffb74d 100%); }
-
-.chart-wrapper {
-  height: 320px;
+.analytics-filter-label {
+  margin-bottom: 8px;
+  color: #5d6780;
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-@media (max-width: 768px) {
-  .chart-wrapper {
-    height: 260px;
+.analytics-filters-row {
+  margin-top: 2px;
+  margin-bottom: 10px;
+}
+
+.analytics-filters-row .MuiGrid-item {
+  display: flex;
+}
+
+.analytics-filters-row .analytics-filter-card {
+  width: 100%;
+  border-radius: 16px !important;
+  border: 1px solid #e5eaf3;
+  box-shadow: 0 4px 14px rgba(20, 33, 61, 0.04);
+}
+
+.analytics-filters-row .analytics-filter-card .MuiCardContent-root {
+  padding: 16px !important;
+}
+
+.analytics-filters-row .MuiInputBase-root {
+  background: #ffffff;
+  font-size: 14px;
+}
+
+.analytics-filters-row .MuiOutlinedInput-root {
+  border-radius: 10px;
+}
+
+.analytics-filters-row .MuiOutlinedInput-notchedOutline {
+  border-color: #d8dfeb !important;
+}
+
+.analytics-filters-row .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: #c4cfe0 !important;
+}
+
+.analytics-filters-row .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: #9fb1cb !important;
+}
+
+.analytics-hourly-cost-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.analytics-hourly-cost-row .analytics-primary-btn {
+  white-space: nowrap;
+  min-width: 82px;
+}
+
+.analytics-hourly-cost-message {
+  display: block;
+  margin-top: 8px;
+  color: #5d6780;
+}
+
+.analytics-surface-card {
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid #e5eaf3;
+  box-shadow: 0 10px 30px rgba(22, 34, 51, 0.06);
+}
+
+.analytics-form-card {
+  margin-top: 24px;
+}
+
+.analytics-table-card {
+  margin-top: 24px;
+}
+
+.analytics-table-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.analytics-section-text {
+  color: #667089;
+}
+
+.analytics-form-title {
+  margin-bottom: 16px;
+  font-weight: 700;
+}
+
+.analytics-form-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.analytics-save-message {
+  color: #42506b;
+}
+
+.analytics-table-container {
+  max-height: 560px;
+  overflow: auto;
+  border: 1px solid #e8edf6;
+  border-radius: 14px;
+}
+
+.analytics-table-field {
+  min-width: 98px;
+}
+
+.analytics-table-field .MuiOutlinedInput-root {
+  height: 36px;
+}
+
+.analytics-table-field--num {
+  min-width: 92px;
+}
+
+.analytics-table-field--hours {
+  min-width: 52px;
+}
+
+.analytics-table-field--reg {
+  min-width: 130px;
+}
+
+.analytics-total-cell {
+  font-weight: 700;
+  color: #1f2937;
+  white-space: nowrap;
+}
+
+.analytics-row-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.analytics-row-message {
+  margin-top: 12px;
+  color: #42506b;
+}
+
+.analytics-summary-card {
+  margin-top: 20px;
+}
+
+.analytics-summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.analytics-summary-toggle {
+  display: flex;
+  gap: 8px;
+}
+
+.analytics-summary-grid {
+  margin-top: 4px;
+}
+
+.analytics-summary-item {
+  border: 1px solid #e6ebf4;
+  border-radius: 14px;
+  padding: 14px;
+  background: #fbfcff;
+}
+
+.analytics-summary-label {
+  color: #667089;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.analytics-summary-value {
+  margin-top: 6px;
+  color: #111827;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.analytics-primary-btn {
+  background: #1f3a8a !important;
+  border-radius: 10px !important;
+  padding: 8px 16px !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+  box-shadow: none !important;
+}
+
+.analytics-primary-btn:hover {
+  background: #1c357f !important;
+}
+
+.analytics-secondary-btn {
+  border-radius: 10px !important;
+  text-transform: none !important;
+}
+
+.analytics-delete-btn {
+  background: #fff1f2 !important;
+  color: #be123c !important;
+  border: 1px solid #fecdd3 !important;
+  border-radius: 10px !important;
+  padding: 4px 10px !important;
+  text-transform: none !important;
+  min-width: 0 !important;
+}
+
+.analytics-page .MuiCardContent-root {
+  padding: 20px !important;
+}
+
+.analytics-page .MuiOutlinedInput-root {
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.analytics-page .MuiOutlinedInput-notchedOutline {
+  border-color: #dbe2ee !important;
+}
+
+.analytics-page .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: #c8d5e8 !important;
+}
+
+.analytics-page .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: #9fb5d5 !important;
+}
+
+.analytics-page .MuiTableHead-root .MuiTableCell-root {
+  background: #f8faff;
+  color: #4a5874;
+  font-weight: 600;
+  text-align: center;
+}
+
+.analytics-page .MuiTableBody-root .MuiTableCell-root {
+  border-bottom: 1px solid #edf2fa;
+  text-align: center;
+}
+
+.analytics-table-field .MuiInputBase-input,
+.analytics-table-field .MuiSelect-select {
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .analytics-page {
+    min-height: 50vh;
+    padding: 14px 0;
   }
-}
 
-.kpi-card .MuiTypography-subtitle2 {
-  color: rgba(0,0,0,0.6);
-}
-
-.kpi-card .MuiAvatar-root {
-  width: 44px;
-  height: 44px;
-  font-size: 16px;
-}
-
-.range-button {
-  text-transform: none;
+  .analytics-table-header-row {
+    align-items: stretch;
+  }
 }
