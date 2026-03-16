@@ -114,23 +114,25 @@ const normalizeRecordFromDb = (docData, id) => ({
 
 const getRowKey = (row) => row.id || row.tempId;
 
-const calculateSummary = (records, hourlyRate) => {
+const calculateSummary = (records) => {
   const totals = records.reduce(
     (acc, record) => {
-      const hours = toNumber(record.hours);
       const partsCost = toNumber(record.partsCost);
       const partsSold = toNumber(record.partsSold);
       const labourSold = toNumber(record.labour);
       const totalInclVat = toNumber(record.totalInclVat);
       const vat = toNumber(record.vat);
+      const isCash = record.invoiceType === 'CASH';
 
       acc.partsCost += partsCost;
       acc.partsSold += partsSold;
       acc.labourSold += labourSold;
       acc.totalInvoices += totalInclVat;
       acc.vat += vat;
+      if (isCash) {
+        acc.cashTotal += totalInclVat;
+      }
       acc.jobs += 1;
-      acc.hours += hours;
       return acc;
     },
     {
@@ -139,24 +141,21 @@ const calculateSummary = (records, hourlyRate) => {
       labourSold: 0,
       totalInvoices: 0,
       vat: 0,
+      cashTotal: 0,
       jobs: 0,
-      hours: 0,
     }
   );
 
-  const labourCost = totals.hours * hourlyRate;
-
   return {
     partsCost: totals.partsCost,
-    labourCost,
     partsSold: totals.partsSold,
     labourSold: totals.labourSold,
     partsProfit: totals.partsSold - totals.partsCost,
-    labourProfit: totals.labourSold - labourCost,
+    labourProfit: totals.labourSold,
     totalInvoices: totals.totalInvoices,
     vat: totals.vat,
+    cashTotal: totals.cashTotal,
     jobs: totals.jobs,
-    hours: totals.hours,
   };
 };
 
@@ -174,10 +173,10 @@ const Analytics = () => {
   const weekOptions = useMemo(() => buildWeekOptionsForCurrentYear(), []);
 
   const [selectedWeek, setSelectedWeek] = useState(() => weekOptions[weekOptions.length - 1]?.value || '');
-  const [hourlyLabourCost, setHourlyLabourCost] = useState(35);
-  const [hourlyLabourCostInput, setHourlyLabourCostInput] = useState('35');
-  const [isSavingHourlyCost, setIsSavingHourlyCost] = useState(false);
-  const [hourlyCostMessage, setHourlyCostMessage] = useState('');
+  const [hourlyLabourRate, setHourlyLabourRate] = useState(35);
+  const [hourlyLabourRateInput, setHourlyLabourRateInput] = useState('35');
+  const [isSavingHourlyRate, setIsSavingHourlyRate] = useState(false);
+  const [hourlyRateMessage, setHourlyRateMessage] = useState('');
   const [mechanics, setMechanics] = useState([]);
   const [selectedMechanicId, setSelectedMechanicId] = useState('all');
   const [savedRecords, setSavedRecords] = useState([]);
@@ -272,51 +271,51 @@ const Analytics = () => {
       settingsDocRef,
       (snapshot) => {
         const data = snapshot.data();
-        const numeric = Number(data?.hourlyLabourCost);
-        const cost = Number.isFinite(numeric) && numeric >= 0 ? numeric : 35;
-        setHourlyLabourCost(cost);
-        setHourlyLabourCostInput(String(cost));
+        const numeric = Number(data?.hourlyLabourRate);
+        const rate = Number.isFinite(numeric) && numeric >= 0 ? numeric : 35;
+        setHourlyLabourRate(rate);
+        setHourlyLabourRateInput(String(rate));
       },
       (error) => {
-        console.error('Failed to load hourly labour cost settings:', error);
+        console.error('Failed to load hourly labour rate settings:', error);
       }
     );
 
     return () => unsubscribe();
   }, [settingsDocRef]);
 
-  const handleHourlyLabourCostChange = (value) => {
+  const handleHourlyLabourRateChange = (value) => {
     if (value === '') {
-      setHourlyLabourCostInput('');
+      setHourlyLabourRateInput('');
       return;
     }
 
     if (/^\d*\.?\d*$/.test(value)) {
-      setHourlyLabourCostInput(value);
+      setHourlyLabourRateInput(value);
     }
   };
 
-  const handleSaveHourlyLabourCost = async () => {
-    const numeric = Number(hourlyLabourCostInput);
+  const handleSaveHourlyLabourRate = async () => {
+    const numeric = Number(hourlyLabourRateInput);
     if (!Number.isFinite(numeric) || numeric < 0) {
-      setHourlyCostMessage('Enter a valid hourly labour cost.');
+      setHourlyRateMessage('Enter a valid hourly labour rate.');
       return;
     }
 
     try {
-      setIsSavingHourlyCost(true);
-      setHourlyCostMessage('');
+      setIsSavingHourlyRate(true);
+      setHourlyRateMessage('');
       await setDoc(settingsDocRef, {
-        hourlyLabourCost: numeric,
+        hourlyLabourRate: numeric,
         updatedAt: serverTimestamp(),
       }, { merge: true });
-      setHourlyLabourCost(numeric);
-      setHourlyCostMessage('Hourly cost saved for this location.');
+      setHourlyLabourRate(numeric);
+      setHourlyRateMessage('Hourly rate saved for this location.');
     } catch (error) {
-      console.error('Failed to save hourly labour cost:', error);
-      setHourlyCostMessage('Failed to save hourly cost. Please try again.');
+      console.error('Failed to save hourly labour rate:', error);
+      setHourlyRateMessage('Failed to save hourly rate. Please try again.');
     } finally {
-      setIsSavingHourlyCost(false);
+      setIsSavingHourlyRate(false);
     }
   };
 
@@ -342,9 +341,37 @@ const Analytics = () => {
         nextRow.technicianName = tech?.name || '';
       }
 
-      if (field === 'total' || field === 'vat') {
-        const totalValue = field === 'total' ? value : nextRow.total;
-        const vatValue = field === 'vat' ? value : nextRow.vat;
+      // Auto-populate labour when hours changes
+      if (field === 'hours') {
+        const hours = toNumber(value);
+        const labour = hours * hourlyLabourRate;
+        nextRow.labour = labour > 0 ? String(labour) : '';
+      }
+
+      // Auto-populate total when labour or partsSold changes
+      if (field === 'labour' || field === 'partsSold') {
+        const labour = field === 'labour' ? toNumber(value) : toNumber(nextRow.labour);
+        const partsSold = field === 'partsSold' ? toNumber(value) : toNumber(nextRow.partsSold);
+        const total = labour + partsSold;
+        nextRow.total = total > 0 ? String(total) : '';
+      }
+
+      // Auto-populate VAT as 13.5% of total (calculate based on the current total value)
+      const currentTotal = (field === 'hours' || field === 'labour' || field === 'partsSold') 
+        ? toNumber(nextRow.total) 
+        : (field === 'total') 
+        ? toNumber(value) 
+        : toNumber(nextRow.total);
+
+      if (field === 'hours' || field === 'labour' || field === 'partsSold' || field === 'total') {
+        const vat = currentTotal * 0.135;
+        nextRow.vat = vat > 0 ? String(vat.toFixed(2)) : '';
+      }
+
+      // Update totalInclVat based on total and vat
+      if (field === 'total' || field === 'vat' || field === 'hours' || field === 'labour' || field === 'partsSold') {
+        const totalValue = nextRow.total;
+        const vatValue = nextRow.vat;
         nextRow.totalInclVat = String(toNumber(totalValue) + toNumber(vatValue));
       }
 
@@ -376,7 +403,7 @@ const Analytics = () => {
       total: toNumber(row.total),
       vat: toNumber(row.vat),
       totalInclVat: toNumber(row.total) + toNumber(row.vat),
-      hourlyLabourCost: toNumber(hourlyLabourCost),
+      hourlyLabourRate: toNumber(hourlyLabourRate),
       updatedAt: serverTimestamp(),
     };
 
@@ -460,14 +487,12 @@ const Analytics = () => {
   }, [yearlyRecords, selectedMechanicId]);
 
   const weeklySummary = useMemo(() => {
-    const hourlyRate = Number(hourlyLabourCost) || 0;
-    return calculateSummary(visibleRecords, hourlyRate);
-  }, [visibleRecords, hourlyLabourCost]);
+    return calculateSummary(visibleRecords);
+  }, [visibleRecords]);
 
   const yearlySummary = useMemo(() => {
-    const hourlyRate = Number(hourlyLabourCost) || 0;
-    return calculateSummary(visibleYearlyRecords, hourlyRate);
-  }, [visibleYearlyRecords, hourlyLabourCost]);
+    return calculateSummary(visibleYearlyRecords);
+  }, [visibleYearlyRecords]);
 
   const activeSummary = summaryView === 'weekly' ? weeklySummary : yearlySummary;
   const isSummaryLoading = summaryView === 'yearly' ? isLoadingYearly : isLoadingRecords;
@@ -525,30 +550,30 @@ const Analytics = () => {
               <Card className="analytics-filter-card analytics-surface-card">
                 <CardContent>
                   <Typography variant="subtitle2" className="analytics-filter-label">
-                    Hourly Labour Cost
+                    Hourly Labour Rate
                   </Typography>
                   <Box className="analytics-hourly-cost-row">
                     <TextField
                       fullWidth
                       size="small"
                       type="text"
-                      value={hourlyLabourCostInput}
-                      onChange={(event) => handleHourlyLabourCostChange(event.target.value)}
+                      value={hourlyLabourRateInput}
+                      onChange={(event) => handleHourlyLabourRateChange(event.target.value)}
                       inputProps={{ inputMode: 'decimal' }}
                     />
                     <Button
                       className="analytics-primary-btn"
                       variant="contained"
                       size="small"
-                      disabled={isSavingHourlyCost}
-                      onClick={handleSaveHourlyLabourCost}
+                      disabled={isSavingHourlyRate}
+                      onClick={handleSaveHourlyLabourRate}
                     >
-                      {isSavingHourlyCost ? 'Saving...' : 'Save'}
+                      {isSavingHourlyRate ? 'Saving...' : 'Save'}
                     </Button>
                   </Box>
-                  {hourlyCostMessage && (
+                  {hourlyRateMessage && (
                     <Typography variant="caption" className="analytics-hourly-cost-message">
-                      {hourlyCostMessage}
+                      {hourlyRateMessage}
                     </Typography>
                   )}
                 </CardContent>
@@ -599,8 +624,8 @@ const Analytics = () => {
                   </Grid>
                   <Grid item xs={12} sm={6} md={3}>
                     <Box className="analytics-summary-item">
-                      <Typography className="analytics-summary-label">Labour Cost</Typography>
-                      <Typography className="analytics-summary-value">{currencyFormatter.format(activeSummary.labourCost)}</Typography>
+                      <Typography className="analytics-summary-label">Cash Total</Typography>
+                      <Typography className="analytics-summary-value">{currencyFormatter.format(activeSummary.cashTotal)}</Typography>
                     </Box>
                   </Grid>
                   <Grid item xs={12} sm={6} md={3}>
