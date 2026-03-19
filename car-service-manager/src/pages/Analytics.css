@@ -8,6 +8,37 @@
   padding: 20px 0;
 }
 
+.analytics-passcode-wrapper {
+  min-height: calc(100vh - 120px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.analytics-passcode-card {
+  width: 100%;
+  max-width: 480px;
+}
+
+.analytics-passcode-form {
+  margin-top: 16px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.analytics-passcode-error {
+  margin-top: 12px;
+  color: #b42318;
+}
+
+@media (max-width: 640px) {
+  .analytics-passcode-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 .analytics-filter-card {
   height: 100%;
 }
@@ -24,6 +55,23 @@
 .analytics-filters-row {
   margin-top: 2px;
   margin-bottom: 10px;
+}
+
+.analytics-owner-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.analytics-lock-btn {
+  border-color: #d0d8e6 !important;
+  color: #344054 !important;
+  background: #ffffff !important;
+}
+
+.analytics-lock-btn:hover {
+  border-color: #b9c6da !important;
+  background: #f9fbff !important;
 }
 
 .analytics-filters-row .MuiGrid-item {
@@ -281,6 +329,14 @@
   .analytics-page {
     min-height: 50vh;
     padding: 14px 0;
+  }
+
+  .analytics-owner-actions {
+    justify-content: stretch;
+  }
+
+  .analytics-owner-actions .analytics-lock-btn {
+    width: 100%;
   }
 
   .analytics-table-header-row {

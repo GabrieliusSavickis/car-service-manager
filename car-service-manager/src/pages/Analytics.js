@@ -58,6 +58,8 @@ const buildWeekOptionsForCurrentYear = () => {
 
 const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const numericFields = ['hours', 'partsCost', 'partsSold', 'labour', 'total', 'vat'];
+const ANALYTICS_PASSCODE = '2009';
+const ANALYTICS_PASSCODE_SESSION_KEY = 'analytics-passcode-unlocked';
 
 const currencyFormatter = new Intl.NumberFormat('en-IE', {
   style: 'currency',
@@ -186,6 +188,15 @@ const Analytics = () => {
   const [summaryView, setSummaryView] = useState('weekly');
   const [rowActionMessage, setRowActionMessage] = useState('');
   const [savingRowKey, setSavingRowKey] = useState('');
+  const [passcodeInput, setPasscodeInput] = useState('');
+  const [passcodeError, setPasscodeError] = useState('');
+  const [isPasscodeVerified, setIsPasscodeVerified] = useState(() => {
+    try {
+      return window.sessionStorage.getItem(ANALYTICS_PASSCODE_SESSION_KEY) === 'true';
+    } catch (error) {
+      return false;
+    }
+  });
 
   const selectedYear = useMemo(() => {
     const yearPart = selectedWeek?.split('-W')[0];
@@ -193,6 +204,11 @@ const Analytics = () => {
   }, [selectedWeek]);
 
   useEffect(() => {
+    if (!isPasscodeVerified) {
+      setMechanics([]);
+      return;
+    }
+
     const loadMechanics = async () => {
       try {
         const fetchedTechnicians = await getTechnicians(locationSuffix);
@@ -207,9 +223,14 @@ const Analytics = () => {
     };
 
     loadMechanics();
-  }, [locationSuffix]);
+  }, [isPasscodeVerified, locationSuffix]);
 
   useEffect(() => {
+    if (!isPasscodeVerified) {
+      setSavedRecords([]);
+      return;
+    }
+
     if (!selectedWeek) {
       setSavedRecords([]);
       return;
@@ -234,9 +255,14 @@ const Analytics = () => {
     };
 
     loadSavedRecords();
-  }, [recordsCollectionName, selectedWeek]);
+  }, [isPasscodeVerified, recordsCollectionName, selectedWeek]);
 
   useEffect(() => {
+    if (!isPasscodeVerified) {
+      setYearlyRecords([]);
+      return;
+    }
+
     if (!selectedYear) {
       setYearlyRecords([]);
       return;
@@ -264,9 +290,13 @@ const Analytics = () => {
     };
 
     loadYearlyRecords();
-  }, [recordsCollectionName, selectedYear]);
+  }, [isPasscodeVerified, recordsCollectionName, selectedYear]);
 
   useEffect(() => {
+    if (!isPasscodeVerified) {
+      return undefined;
+    }
+
     const unsubscribe = onSnapshot(
       settingsDocRef,
       (snapshot) => {
@@ -282,7 +312,38 @@ const Analytics = () => {
     );
 
     return () => unsubscribe();
-  }, [settingsDocRef]);
+  }, [isPasscodeVerified, settingsDocRef]);
+
+  const handlePasscodeSubmit = (event) => {
+    event.preventDefault();
+
+    if (passcodeInput === ANALYTICS_PASSCODE) {
+      setIsPasscodeVerified(true);
+      setPasscodeError('');
+      setPasscodeInput('');
+
+      try {
+        window.sessionStorage.setItem(ANALYTICS_PASSCODE_SESSION_KEY, 'true');
+      } catch (error) {
+        // Ignore storage errors and allow current-session access.
+      }
+      return;
+    }
+
+    setPasscodeError('Incorrect passcode. Try again.');
+  };
+
+  const handleLockAnalytics = () => {
+    try {
+      window.sessionStorage.removeItem(ANALYTICS_PASSCODE_SESSION_KEY);
+    } catch (error) {
+      // Ignore storage errors and lock page state locally.
+    }
+
+    setPasscodeInput('');
+    setPasscodeError('');
+    setIsPasscodeVerified(false);
+  };
 
   const handleHourlyLabourRateChange = (value) => {
     if (value === '') {
@@ -497,11 +558,71 @@ const Analytics = () => {
   const activeSummary = summaryView === 'weekly' ? weeklySummary : yearlySummary;
   const isSummaryLoading = summaryView === 'yearly' ? isLoadingYearly : isLoadingRecords;
 
+  if (!isPasscodeVerified) {
+    return (
+      <div className="analytics-page-shell">
+        <Header />
+        <Container maxWidth="sm" sx={{ px: 2 }}>
+          <Box className="analytics-passcode-wrapper">
+            <Card className="analytics-passcode-card analytics-surface-card">
+              <CardContent>
+                <Typography variant="h5" className="analytics-form-title">
+                  Owner Access
+                </Typography>
+                <Typography variant="body2" className="analytics-section-text">
+                  Enter the analytics passcode to continue.
+                </Typography>
+
+                <Box component="form" onSubmit={handlePasscodeSubmit} className="analytics-passcode-form">
+                  <TextField
+                    label="Passcode"
+                    type="password"
+                    size="small"
+                    fullWidth
+                    value={passcodeInput}
+                    onChange={(event) => {
+                      setPasscodeInput(event.target.value);
+                      if (passcodeError) {
+                        setPasscodeError('');
+                      }
+                    }}
+                    autoComplete="off"
+                    inputProps={{ inputMode: 'numeric' }}
+                  />
+                  <Button type="submit" className="analytics-primary-btn" variant="contained">
+                    Unlock Analytics
+                  </Button>
+                </Box>
+
+                {passcodeError && (
+                  <Typography variant="body2" className="analytics-passcode-error">
+                    {passcodeError}
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+          </Box>
+        </Container>
+      </div>
+    );
+  }
+
   return (
     <div className="analytics-page-shell">
       <Header />
       <Container maxWidth={false} sx={{ px: { xs: 2, md: 3, lg: 4 } }}>
         <Box className="analytics-page" sx={{ my: 2 }}>
+          <Box className="analytics-owner-actions">
+            <Button
+              variant="outlined"
+              size="small"
+              className="analytics-secondary-btn analytics-lock-btn"
+              onClick={handleLockAnalytics}
+            >
+              Lock Analytics
+            </Button>
+          </Box>
+
           <Grid container spacing={3} className="analytics-filters-row">
             <Grid item xs={12} md={4}>
               <Card className="analytics-filter-card analytics-surface-card">
