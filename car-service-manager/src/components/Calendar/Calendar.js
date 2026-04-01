@@ -18,9 +18,13 @@ const timeSlots = [
 
 const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician }) => {
 
+  const getAppointmentDurationSlots = (appointment) => (
+    appointment.details.segmentExpectedTime ?? appointment.details.expectedTime
+  );
+
   const calculateAppointmentSpan = (appointment) => {
     const startTimeIndex = timeSlots.indexOf(appointment.startTime);
-    let remainingSlots = appointment.details.expectedTime;
+    let remainingSlots = getAppointmentDurationSlots(appointment);
     let totalDuration = 0;
 
     for (let i = startTimeIndex; i < timeSlots.length; i++) {
@@ -85,7 +89,7 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
   // New helper to build a "09:00 – 12:00" label
   const getAppointmentTimeRange = (appointment) => {
     const start = appointment.startTime;
-    const slots = appointment.details.expectedTime;
+    const slots = getAppointmentDurationSlots(appointment);
     const startIdx = timeSlots.indexOf(start);
     const endIdx = Math.min(startIdx + slots, timeSlots.length - 1);
     const end = timeSlots[endIdx];

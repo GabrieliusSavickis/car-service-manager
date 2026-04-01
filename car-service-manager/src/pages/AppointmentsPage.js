@@ -3,7 +3,7 @@ import Header from '../components/Header/Header';
 import Calendar from '../components/Calendar/Calendar';
 import AppointmentModal from '../components/AppointmentModal/AppointmentModal';
 import { firestore } from '../firebase'; // Import Firestore
-import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, setDoc, onSnapshot, getDocs, deleteField } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, setDoc, onSnapshot, getDocs, getDoc, deleteField } from 'firebase/firestore';
 import DatePicker from '../components/DatePicker/DatePicker';
 import './AppointmentsPage.css';
 import { getTechnicians, clearTechniciansCache } from '../utils/technicianUtils';
@@ -173,6 +173,7 @@ function AppointmentsPage() {
 
     // Clean the appointment: remove tech field if we have a techId (migrate to new format)
     let appointmentToSave = { ...newAppointment };
+    let appointmentGroupId = appointmentToSave.appointmentGroupId || appointmentToSave.id;
     
     // For new appointments, delete the tech field completely
     if (!newAppointment.id && appointmentToSave.tech !== undefined) {
@@ -198,7 +199,7 @@ function AppointmentsPage() {
       // Handle multi-day appointments
       const remainingSlots = totalSlotsNeeded - availableSlotsToday;
       const nextDay = getNextWorkingDay(new Date(appointmentToSave.date));
-      const nextDayOverlap = await checkNextDayOverlap(nextDay, remainingSlots, appointmentToSave.techId);
+      const nextDayOverlap = await checkNextDayOverlap(nextDay, remainingSlots, appointmentToSave.techId, appointmentToSave.appointmentGroupId);
 
       if (nextDayOverlap) {
         alert('The appointment would overlap with an existing appointment on the next working day.');
@@ -210,14 +211,23 @@ function AppointmentsPage() {
         ...appointmentToSave,
         details: {
           ...appointmentToSave.details,
-          expectedTime: availableSlotsToday,
+          expectedTime: totalSlotsNeeded,
+          segmentExpectedTime: availableSlotsToday,
         },
       };
+      if (appointmentGroupId !== undefined) {
+        updatedAppointment.appointmentGroupId = appointmentGroupId;
+      }
 
       if (updatedAppointment.id) {
         const appointmentRef = doc(firestore, appointmentsCollectionName, updatedAppointment.id);
         // For existing appointments, convert tech: undefined to deleteField()
         const updateData = { ...updatedAppointment };
+        if (!appointmentGroupId) {
+          appointmentGroupId = updatedAppointment.id;
+          updateData.appointmentGroupId = appointmentGroupId;
+          updatedAppointment.appointmentGroupId = appointmentGroupId;
+        }
         if (updatedAppointment.tech === undefined) {
           updateData.tech = deleteField();
         }
@@ -226,30 +236,31 @@ function AppointmentsPage() {
         // For new appointments, ensure tech field is not included
         const dataToAdd = { ...updatedAppointment };
         delete dataToAdd.tech;
+        if (dataToAdd.appointmentGroupId === undefined) {
+          delete dataToAdd.appointmentGroupId;
+        }
         const docRef = await addDoc(collection(firestore, appointmentsCollectionName), dataToAdd);
         updatedAppointment.id = docRef.id;
+        appointmentGroupId = docRef.id;
+        updatedAppointment.appointmentGroupId = appointmentGroupId;
+        await updateDoc(doc(firestore, appointmentsCollectionName, docRef.id), { appointmentGroupId });
       }
 
-      if (remainingSlots > 0) {
-        const nextDayAppointment = {
-          ...appointmentToSave,
-          date: nextDay.toDateString(),
-          startTime: workdayStart,
-          details: {
-            ...appointmentToSave.details,
-            expectedTime: remainingSlots,
-          },
-        };
-        // Ensure tech field is not included for new appointments
-        delete nextDayAppointment.tech;
-        await addDoc(collection(firestore, appointmentsCollectionName), nextDayAppointment);
-      }
+      appointmentToSave.id = updatedAppointment.id;
+      appointmentToSave.appointmentGroupId = appointmentGroupId;
+      // Day2 creation/update is handled by the group sync block below.
+      // Do NOT addDoc here for existing appointments — that would create a duplicate.
     } else {
       // Save normally if it doesn't span into the next day
       if (appointmentToSave.id) {
         const appointmentRef = doc(firestore, appointmentsCollectionName, appointmentToSave.id);
         // For existing appointments, convert tech: undefined to deleteField()
         const updateData = { ...appointmentToSave };
+        if (!appointmentGroupId) {
+          appointmentGroupId = appointmentToSave.id;
+        }
+        updateData.appointmentGroupId = appointmentGroupId;
+        appointmentToSave.appointmentGroupId = appointmentGroupId;
         if (appointmentToSave.tech === undefined) {
           updateData.tech = deleteField();
         }
@@ -258,8 +269,116 @@ function AppointmentsPage() {
         // For new appointments, ensure tech field is not included
         const dataToAdd = { ...appointmentToSave };
         delete dataToAdd.tech;
+        if (dataToAdd.appointmentGroupId === undefined) {
+          delete dataToAdd.appointmentGroupId;
+        }
         const docRef = await addDoc(collection(firestore, appointmentsCollectionName), dataToAdd);
         appointmentToSave.id = docRef.id;
+        appointmentGroupId = docRef.id;
+        appointmentToSave.appointmentGroupId = appointmentGroupId;
+        await updateDoc(doc(firestore, appointmentsCollectionName, docRef.id), { appointmentGroupId });
+      }
+    }
+
+    // Keep grouped appointment segments in sync and normalize segment durations
+    if (appointmentToSave.id && appointmentToSave.appointmentGroupId) {
+      const groupedQuery = query(
+        collection(firestore, appointmentsCollectionName),
+        where('appointmentGroupId', '==', appointmentToSave.appointmentGroupId)
+      );
+      const groupedSnapshot = await getDocs(groupedQuery);
+
+      const groupedDocs = groupedSnapshot.docs
+        .map((groupedDoc) => ({ id: groupedDoc.id, ...groupedDoc.data() }));
+
+      if (groupedDocs.length > 0) {
+        // The anchor is always the doc whose id equals appointmentGroupId
+        // (it was set to the first created segment's doc ID at creation time)
+        // The anchor is always the doc whose own id equals its appointmentGroupId
+        // (appointmentGroupId is set to the first-created segment's Firestore ID)
+        const anchorDoc =
+          groupedDocs.find(d => d.id === d.appointmentGroupId) ||
+          groupedDocs.find(d => d.id === appointmentToSave.appointmentGroupId) ||
+          [...groupedDocs].sort((a, b) => {
+            const ad = new Date(a.date), bd = new Date(b.date);
+            if (!isNaN(ad) && !isNaN(bd) && ad - bd !== 0) return ad - bd;
+            return timeSlots.indexOf(a.startTime) - timeSlots.indexOf(b.startTime);
+          })[0];
+        if (!anchorDoc) return;
+        const anchorId = anchorDoc.id;
+        const anchorDate = anchorDoc.date;
+        const anchorStartTime = anchorDoc.startTime;
+        const anchorStartIndex = timeSlots.indexOf(anchorStartTime);
+        const totalExpectedSlots = appointmentToSave.details.expectedTime;
+        const slotsAvailableOnAnchorDay = workdayEndIndex - anchorStartIndex;
+        const anchorSegmentSlots = Math.min(totalExpectedSlots, slotsAvailableOnAnchorDay);
+        const remainingSlots = Math.max(totalExpectedSlots - anchorSegmentSlots, 0);
+
+        const sharedDetails = {
+          ...appointmentToSave.details,
+          expectedTime: totalExpectedSlots,
+        };
+
+        const anchorUpdate = {
+          techId: appointmentToSave.techId,
+          appointmentGroupId: appointmentToSave.appointmentGroupId,
+          details: {
+            ...sharedDetails,
+            segmentExpectedTime: anchorSegmentSlots,
+          },
+        };
+
+        if (appointmentToSave.tech === undefined) {
+          anchorUpdate.tech = deleteField();
+        }
+
+        await updateDoc(doc(firestore, appointmentsCollectionName, anchorId), anchorUpdate);
+
+        const nonAnchorDocs = groupedDocs.filter((groupedDoc) => groupedDoc.id !== anchorId);
+
+        if (remainingSlots > 0) {
+          const nextDay = getNextWorkingDay(new Date(anchorDate));
+          const nextDayDateString = nextDay.toDateString();
+          const secondSegment = nonAnchorDocs.find((groupedDoc) => groupedDoc.date === nextDayDateString)
+            || nonAnchorDocs[0];
+
+          const secondSegmentPayload = {
+            date: nextDayDateString,
+            startTime: workdayStart,
+            techId: appointmentToSave.techId,
+            appointmentGroupId: appointmentToSave.appointmentGroupId,
+            details: {
+              ...sharedDetails,
+              segmentExpectedTime: remainingSlots,
+            },
+          };
+
+          if (secondSegment) {
+            if (appointmentToSave.tech === undefined) {
+              secondSegmentPayload.tech = deleteField();
+            }
+            await updateDoc(doc(firestore, appointmentsCollectionName, secondSegment.id), secondSegmentPayload);
+          } else {
+            // addDoc does not support deleteField() — strip the tech field entirely
+            const newSegmentData = { ...secondSegmentPayload };
+            delete newSegmentData.tech;
+            await addDoc(collection(firestore, appointmentsCollectionName), newSegmentData);
+          }
+
+          const keepIds = new Set([anchorId, secondSegment?.id].filter(Boolean));
+          const extraDocs = groupedDocs.filter((groupedDoc) => !keepIds.has(groupedDoc.id));
+          await Promise.all(
+            extraDocs.map((groupedDoc) =>
+              deleteDoc(doc(firestore, appointmentsCollectionName, groupedDoc.id))
+            )
+          );
+        } else {
+          await Promise.all(
+            nonAnchorDocs.map((groupedDoc) =>
+              deleteDoc(doc(firestore, appointmentsCollectionName, groupedDoc.id))
+            )
+          );
+        }
       }
     }
 
@@ -290,14 +409,14 @@ function AppointmentsPage() {
 
 
   const checkOverlap = (newAppointment) => {
-    const { startTime, details, techId, date, id, tech } = newAppointment;
+    const { startTime, details, techId, date, id, tech, appointmentGroupId: groupId } = newAppointment;
     // Resolve technician name: prefer lookup by techId, otherwise fall back to the appointment's `tech` field
     const technicianFromId = techId ? technicians.find(t => t.id === techId)?.name : undefined;
     const technicianName = technicianFromId || tech || undefined;
     
     const startIndex = timeSlots.indexOf(startTime);
     const appointmentDate = new Date(date);
-    const totalSlotsNeeded = details.expectedTime;
+    const totalSlotsNeeded = details.segmentExpectedTime ?? details.expectedTime;
 
     let remainingSlots = totalSlotsNeeded;
     let currentDate = new Date(appointmentDate);
@@ -309,6 +428,8 @@ function AppointmentsPage() {
       const appointmentsOnCurrentDay = appointments.filter(app => {
         // Exclude the current appointment by ID first
         if (app.id === id) return false;
+        // Exclude siblings in the same appointment group
+        if (groupId && app.appointmentGroupId === groupId) return false;
         
         // Only check same day appointments
         const sameDay = new Date(app.date).toDateString() === currentDate.toDateString();
@@ -330,7 +451,8 @@ function AppointmentsPage() {
         // Check for overlap on the same day
         for (let app of appointmentsOnCurrentDay) {
           const existingStartIndex = timeSlots.indexOf(app.startTime);
-          const existingEndIndex = existingStartIndex + app.details.expectedTime;
+          const existingDuration = app.details.segmentExpectedTime ?? app.details.expectedTime;
+          const existingEndIndex = existingStartIndex + existingDuration;
 
           if (startIndex < existingEndIndex && endIndex > existingStartIndex) {
             return true; // Overlap detected
@@ -343,7 +465,8 @@ function AppointmentsPage() {
         // Check for overlap on subsequent days
         for (let app of appointmentsOnCurrentDay) {
           const existingStartIndex = timeSlots.indexOf(app.startTime);
-          const existingEndIndex = existingStartIndex + app.details.expectedTime;
+          const existingDuration = app.details.segmentExpectedTime ?? app.details.expectedTime;
+          const existingEndIndex = existingStartIndex + existingDuration;
 
           const spanStartIndex = 0;
           const spanEndIndex = Math.min(remainingSlots, timeSlots.length);
@@ -389,7 +512,7 @@ function AppointmentsPage() {
     return false; // No overlap detected
   };
 
-  const checkNextDayOverlap = async (nextDay, remainingSlots, techId) => {
+  const checkNextDayOverlap = async (nextDay, remainingSlots, techId, appointmentGroupId) => {
     // `techId` may be either an id or a technician name (caller may pass techId || tech).
     // Determine whether it's an id known in the `technicians` list.
     const hasId = technicians.some(t => t.id === techId);
@@ -406,13 +529,17 @@ function AppointmentsPage() {
     const spanEndIndex = Math.min(remainingSlots, timeSlots.length);
 
     for (let app of appointmentsOnNextDay) {
+      // Skip siblings of the same group — they are this appointment's own segments
+      if (appointmentGroupId && app.appointmentGroupId === appointmentGroupId) continue;
+
       // Match by id only when we have a valid id; otherwise match by name.
       const matchById = hasId ? (app.techId === techId || app.tech === techId) : false;
       const matchByName = technicianName ? (app.tech === technicianName) : false;
 
       if (matchById || matchByName) {
         const existingStartIndex = timeSlots.indexOf(app.startTime);
-        const existingEndIndex = existingStartIndex + app.details.expectedTime;
+        const existingDuration = app.details.segmentExpectedTime ?? app.details.expectedTime;
+        const existingEndIndex = existingStartIndex + existingDuration;
 
         if (spanStartIndex < existingEndIndex && spanEndIndex > existingStartIndex) {
           return true; // Overlap detected
@@ -448,8 +575,39 @@ function AppointmentsPage() {
   const handleDeleteAppointment = async (id) => {
     if (userRole !== 'admin') return; // Restrict deletion for non-admin users
 
-    await deleteDoc(doc(firestore, appointmentsCollectionName, id));
-    setAppointments((prev) => prev.filter(app => app.id !== id));
+    const appointmentRef = doc(firestore, appointmentsCollectionName, id);
+    const appointmentSnap = await getDoc(appointmentRef);
+
+    if (!appointmentSnap.exists()) {
+      setAppointments((prev) => prev.filter(app => app.id !== id));
+      setIsModalOpen(false);
+      return;
+    }
+
+    const appointmentData = appointmentSnap.data();
+    const appointmentGroupId = appointmentData.appointmentGroupId;
+
+    if (appointmentGroupId) {
+      const groupedQuery = query(
+        collection(firestore, appointmentsCollectionName),
+        where('appointmentGroupId', '==', appointmentGroupId)
+      );
+      const groupedSnapshot = await getDocs(groupedQuery);
+      const idsToDelete = [];
+      const deletePromises = [];
+
+      groupedSnapshot.forEach((groupedDoc) => {
+        idsToDelete.push(groupedDoc.id);
+        deletePromises.push(deleteDoc(doc(firestore, appointmentsCollectionName, groupedDoc.id)));
+      });
+
+      await Promise.all(deletePromises);
+      setAppointments((prev) => prev.filter(app => !idsToDelete.includes(app.id)));
+    } else {
+      await deleteDoc(appointmentRef);
+      setAppointments((prev) => prev.filter(app => app.id !== id));
+    }
+
     setIsModalOpen(false);
   };
 
