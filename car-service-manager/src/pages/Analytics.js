@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box,
   Button,
@@ -56,7 +56,7 @@ const buildWeekOptionsForCurrentYear = () => {
   });
 };
 
-const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const numericFields = ['hours', 'partsCost', 'partsSold', 'labour', 'total', 'vat'];
 const ANALYTICS_PASSCODE = '2009';
 const ANALYTICS_PASSCODE_SESSION_KEY = 'analytics-passcode-unlocked';
@@ -196,8 +196,10 @@ const Analytics = () => {
   const [summaryView, setSummaryView] = useState('weekly');
   const [rowActionMessage, setRowActionMessage] = useState('');
   const [savingRowKey, setSavingRowKey] = useState('');
+  const [highlightedRowKey, setHighlightedRowKey] = useState('');
   const [passcodeInput, setPasscodeInput] = useState('');
   const [passcodeError, setPasscodeError] = useState('');
+  const rowHighlightTimeoutRef = useRef(null);
   const [isPasscodeVerified, setIsPasscodeVerified] = useState(() => {
     try {
       return window.sessionStorage.getItem(ANALYTICS_PASSCODE_SESSION_KEY) === 'true';
@@ -321,6 +323,27 @@ const Analytics = () => {
 
     return () => unsubscribe();
   }, [isPasscodeVerified, settingsDocRef]);
+
+  useEffect(() => {
+    return () => {
+      if (rowHighlightTimeoutRef.current) {
+        clearTimeout(rowHighlightTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const highlightSavedRow = (rowKey) => {
+    setHighlightedRowKey(rowKey);
+
+    if (rowHighlightTimeoutRef.current) {
+      clearTimeout(rowHighlightTimeoutRef.current);
+    }
+
+    rowHighlightTimeoutRef.current = setTimeout(() => {
+      setHighlightedRowKey((current) => (current === rowKey ? '' : current));
+      rowHighlightTimeoutRef.current = null;
+    }, 5000);
+  };
 
   const handlePasscodeSubmit = (event) => {
     event.preventDefault();
@@ -495,6 +518,7 @@ const Analytics = () => {
               }
             : item
         )));
+        highlightSavedRow(rowKey);
         setRowActionMessage('Record updated.');
       } else {
         const createdRef = await addDoc(collection(firestore, recordsCollectionName), {
@@ -514,6 +538,7 @@ const Analytics = () => {
               }
             : item
         )));
+        highlightSavedRow(createdRef.id);
         setRowActionMessage('Record saved.');
       }
     } catch (error) {
@@ -845,7 +870,11 @@ const Analytics = () => {
                         const isSavingThisRow = savingRowKey === rowKey;
 
                         return (
-                          <TableRow key={rowKey} hover>
+                          <TableRow
+                            key={rowKey}
+                            hover
+                            className={highlightedRowKey === rowKey ? 'analytics-saved-row' : ''}
+                          >
                             <TableCell>
                               <TextField
                                 select
