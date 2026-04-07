@@ -68,6 +68,11 @@ const currencyFormatter = new Intl.NumberFormat('en-IE', {
   maximumFractionDigits: 2,
 });
 
+const hoursFormatter = new Intl.NumberFormat('en-IE', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 const toNumber = (value) => Number(value) || 0;
 
 const getTempId = () => `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -119,6 +124,7 @@ const getRowKey = (row) => row.id || row.tempId;
 const calculateSummary = (records) => {
   const totals = records.reduce(
     (acc, record) => {
+      const hours = toNumber(record.hours);
       const partsCost = toNumber(record.partsCost);
       const partsSold = toNumber(record.partsSold);
       const labourSold = toNumber(record.labour);
@@ -126,6 +132,7 @@ const calculateSummary = (records) => {
       const vat = toNumber(record.vat);
       const isCash = record.invoiceType === 'CASH';
 
+      acc.hoursSold += hours;
       acc.partsCost += partsCost;
       acc.partsSold += partsSold;
       acc.labourSold += labourSold;
@@ -138,6 +145,7 @@ const calculateSummary = (records) => {
       return acc;
     },
     {
+      hoursSold: 0,
       partsCost: 0,
       partsSold: 0,
       labourSold: 0,
@@ -149,11 +157,11 @@ const calculateSummary = (records) => {
   );
 
   return {
+    hoursSold: totals.hoursSold,
     partsCost: totals.partsCost,
     partsSold: totals.partsSold,
     labourSold: totals.labourSold,
     partsProfit: totals.partsSold - totals.partsCost,
-    labourProfit: totals.labourSold,
     totalInvoices: totals.totalInvoices,
     vat: totals.vat,
     cashTotal: totals.cashTotal,
@@ -769,8 +777,8 @@ const Analytics = () => {
                   </Grid>
                   <Grid item xs={12} sm={6} md={3}>
                     <Box className="analytics-summary-item">
-                      <Typography className="analytics-summary-label">Labour Profit</Typography>
-                      <Typography className="analytics-summary-value">{currencyFormatter.format(activeSummary.labourProfit)}</Typography>
+                      <Typography className="analytics-summary-label">Hours Sold</Typography>
+                      <Typography className="analytics-summary-value">{hoursFormatter.format(activeSummary.hoursSold)} hrs</Typography>
                     </Box>
                   </Grid>
                   <Grid item xs={12} sm={6} md={3}>
