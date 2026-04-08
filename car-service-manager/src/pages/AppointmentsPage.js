@@ -36,11 +36,30 @@ function AppointmentsPage() {
     '01/01', '17/03', '25/12', '26/12', // Fixed date holidays
   ];
 
+  // Calculate Easter date using the Computus algorithm
+  const getEasterDate = (year) => {
+    const a = year % 19;
+    const b = Math.floor(year / 100);
+    const c = year % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31);
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(year, month - 1, day);
+  };
+
   const getDynamicBankHolidays = (year) => {
     const getFirstMonday = (month) => {
       const firstDay = new Date(year, month, 1);
       const dayOfWeek = firstDay.getDay();
-      return new Date(year, month, 1 + (dayOfWeek === 0 ? 1 : 8 - dayOfWeek));
+      return new Date(year, month, 1 + (8 - dayOfWeek) % 7);
     };
 
     const getLastMonday = (month) => {
@@ -49,12 +68,18 @@ function AppointmentsPage() {
       return new Date(year, month, lastDay.getDate() - (dayOfWeek + 6) % 7);
     };
 
+    // Easter Monday is the day after Easter
+    const easter = getEasterDate(year);
+    const easterMonday = new Date(easter);
+    easterMonday.setDate(easter.getDate() + 1);
+
     return [
-      getFirstMonday(1).toLocaleDateString('en-IE'), // February
-      getFirstMonday(4).toLocaleDateString('en-IE'), // May
-      getFirstMonday(5).toLocaleDateString('en-IE'), // June
-      getFirstMonday(7).toLocaleDateString('en-IE'), // August
-      getLastMonday(9).toLocaleDateString('en-IE')  // October
+      getFirstMonday(1).toLocaleDateString('en-IE'), // February (First Monday)
+      getFirstMonday(4).toLocaleDateString('en-IE'), // May (First Monday)
+      getFirstMonday(5).toLocaleDateString('en-IE'), // June (First Monday)
+      getFirstMonday(7).toLocaleDateString('en-IE'), // August (First Monday)
+      getLastMonday(9).toLocaleDateString('en-IE'),  // October (Last Monday)
+      easterMonday.toLocaleDateString('en-IE')       // Easter Monday
     ];
   };
 
@@ -131,7 +156,10 @@ function AppointmentsPage() {
 
   const isNonWorkingDay = (date) => {
     const day = date.getDay(); // 0 = Sunday, 6 = Saturday
-    const formattedDate = date.toLocaleDateString('en-IE').substring(0, 5); // Format MM/DD
+    // Format as DD/MM for consistent comparison
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const dateOfMonth = String(date.getDate()).padStart(2, '0');
+    const formattedDate = `${dateOfMonth}/${month}`;
     const year = date.getFullYear();
     const dynamicBankHolidays = getDynamicBankHolidays(year);
 
