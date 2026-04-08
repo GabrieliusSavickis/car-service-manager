@@ -19,4 +19,12 @@
   .today-button:hover {
     background-color: #a32e1c;
   }
+
+  .unavailable-button {
+      background-color: #5a6268;
+    }
+
+  .unavailable-button:hover {
+      background-color: #494f54;
+    }
   

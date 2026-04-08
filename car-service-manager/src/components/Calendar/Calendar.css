@@ -67,6 +67,10 @@
   overflow: visible;
 }
 
+.time-slot.unavailable-slot {
+  background-color: #f4f4f4;
+}
+
 .time-slot.lunch-time-slot {
   background-color: #ccc; /* Gray out lunch time slots */
   pointer-events: none; /* Disable clicking */
@@ -148,4 +152,14 @@
   margin-bottom: 2px;
   text-align: center;
   color: #fff; /* Ensures it contrasts on your colored background */
+}
+
+.unavailable-appointment {
+  background-color: rgba(136, 136, 136, 0.35) !important;
+  color: #2e2e2e;
+  border: 1px dashed rgba(90, 90, 90, 0.7);
+}
+
+.unavailable-appointment .appointment-time {
+  color: #2e2e2e;
 }

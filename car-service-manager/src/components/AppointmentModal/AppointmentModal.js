@@ -154,7 +154,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
 
     // Just update the vehicleReg in formData, without performing lookup
     if (name === 'vehicleReg') {
-      const updatedValue = value.toUpperCase();
+      const updatedValue = value.toUpperCase().replace(/\s+/g, '');
       setFormData((prev) => ({ ...prev, vehicleReg: updatedValue }));
       return;
     }
@@ -435,10 +435,15 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   };
 
   const handleVehicleRegKeyDown = async (e) => {
+    if (e.key === ' ') {
+      e.preventDefault();
+      return;
+    }
+
     if (e.key === 'Enter') {
       e.preventDefault(); // Prevent the default action (form submission)
 
-      const updatedValue = formData.vehicleReg.trim().toUpperCase();
+      const updatedValue = formData.vehicleReg.trim().toUpperCase().replace(/\s+/g, '');
       if (updatedValue !== '') {
         const accountsCollection = collection(firestore, accountsCollectionName);
         const q = query(accountsCollection, where('vehicleReg', '==', updatedValue));

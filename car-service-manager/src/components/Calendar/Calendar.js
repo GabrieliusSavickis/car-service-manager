@@ -16,7 +16,7 @@ const timeSlots = [
   '17:00', '17:30',
 ];
 
-const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician }) => {
+const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician, unavailableByTechId = {} }) => {
 
   const getAppointmentDurationSlots = (appointment) => (
     appointment.details.segmentExpectedTime ?? appointment.details.expectedTime
@@ -38,7 +38,6 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
 
         if (remainingSlots > 0) {
           totalDuration += 1;  // Add one slot for the lunch break divider
-          i++; // Skip to 13:30
         }
       } else {
         totalDuration += 1;
@@ -96,6 +95,12 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
     return `${start} – ${end}`;
   };
 
+  // Match full-day unavailable blocks to the same span logic as appointments (including lunch divider).
+  const fullDayUnavailableSpan = calculateAppointmentSpan({
+    startTime: timeSlots[0],
+    details: { expectedTime: timeSlots.length },
+  });
+
   return (
     <div
       className="calendar-container"
@@ -136,10 +141,12 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
                 const appointment = appointments.find(
                   (app) => app.startTime === time && (app.techId === tech.id || app.tech === tech.id || app.tech === tech.name)
                 );
+                const unavailableReason = unavailableByTechId[tech.id];
+                const isUnavailable = Boolean(unavailableReason);
                 return (
                   <div
                     key={techIndex}
-                    className="time-slot"
+                    className={`time-slot ${isUnavailable ? 'unavailable-slot' : ''}`}
                     onClick={() => onTimeSlotClick(time, tech.id)}
                   >
                     {appointment && (
@@ -169,6 +176,24 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
                             calculateAppointmentSpan(appointment)
                           )}
                         </div>
+                      </div>
+                    )}
+                    {!appointment && isUnavailable && time === timeSlots[0] && (
+                      <div
+                        className="appointment unavailable-appointment"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onTimeSlotClick(time, tech.id);
+                        }}
+                        style={{
+                          height: getAppointmentHeight(fullDayUnavailableSpan),
+                          gridRow: `span ${fullDayUnavailableSpan}`,
+                        }}
+                      >
+                        <div className="appointment-time">
+                          <strong>Unavailable</strong>
+                        </div>
+                        <div>{unavailableReason}</div>
                       </div>
                     )}
                   </div>

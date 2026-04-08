@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import Header from '../components/Header/Header';
 import Calendar from '../components/Calendar/Calendar';
 import AppointmentModal from '../components/AppointmentModal/AppointmentModal';
+import MechanicUnavailabilityModal from '../components/MechanicUnavailabilityModal/MechanicUnavailabilityModal';
 import { firestore } from '../firebase'; // Import Firestore
-import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, setDoc, onSnapshot, getDocs, getDoc, deleteField } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, setDoc, onSnapshot, getDocs, getDoc, deleteField, Timestamp } from 'firebase/firestore';
 import DatePicker from '../components/DatePicker/DatePicker';
 import './AppointmentsPage.css';
 import { getTechnicians, clearTechniciansCache } from '../utils/technicianUtils';
@@ -22,6 +23,7 @@ function AppointmentsPage() {
   // Define the collection names
   const appointmentsCollectionName = 'appointments' + locationSuffix;
   const accountsCollectionName = 'accounts' + locationSuffix;
+  const unavailabilityCollectionName = 'mechanicUnavailability' + locationSuffix;
 
   const [appointments, setAppointments] = useState([]);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
@@ -30,6 +32,8 @@ function AppointmentsPage() {
   const [userRole, setUserRole] = useState('');
   const [warningMessage, setWarningMessage] = useState(''); // For showing warnings to users
   const [technicians, setTechnicians] = useState([]);
+  const [unavailability, setUnavailability] = useState([]);
+  const [isUnavailabilityModalOpen, setIsUnavailabilityModalOpen] = useState(false);
   
 
   const staticBankHolidays = [
@@ -127,6 +131,38 @@ function AppointmentsPage() {
     loadTechnicians();
   }, [locationSuffix]);
 
+  // Load mechanic unavailability ranges that include the selected date
+  useEffect(() => {
+    const dayStart = new Date(selectedDate);
+    dayStart.setHours(0, 0, 0, 0);
+
+    const dayEnd = new Date(selectedDate);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const q = query(
+      collection(firestore, unavailabilityCollectionName),
+      where('endDay', '>=', Timestamp.fromDate(dayStart))
+    );
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const fetched = [];
+
+      querySnapshot.forEach((unavailableDoc) => {
+        const data = unavailableDoc.data();
+        const start = data.startDay?.toDate ? data.startDay.toDate() : new Date(data.startDay);
+        const end = data.endDay?.toDate ? data.endDay.toDate() : new Date(data.endDay);
+
+        if (start <= dayEnd && end >= dayStart) {
+          fetched.push({ id: unavailableDoc.id, ...data });
+        }
+      });
+
+      setUnavailability(fetched);
+    });
+
+    return () => unsubscribe();
+  }, [selectedDate, unavailabilityCollectionName]);
+
   // Allow inline editing of technician names from the calendar
   const handleEditTechnician = async (techId, currentName) => {
     // Only allow admins to rename technicians
@@ -166,6 +202,17 @@ function AppointmentsPage() {
     return day === 0 || day === 6 || staticBankHolidays.includes(formattedDate) || dynamicBankHolidays.includes(date.toLocaleDateString('en-IE'));
   };
 
+  const getMechanicUnavailabilityForSelectedDay = (techId) => {
+    return unavailability.find((entry) => entry.mechanic === techId);
+  };
+
+  const unavailableByTechId = unavailability.reduce((acc, entry) => {
+    if (entry.mechanic) {
+      acc[entry.mechanic] = entry.reason || 'Unavailable';
+    }
+    return acc;
+  }, {});
+
   const handleTimeSlotClick = (time, techId) => {
     const selectedDay = new Date(selectedDate);
 
@@ -173,6 +220,16 @@ function AppointmentsPage() {
       setWarningMessage('This date is a bank holiday or weekend. Appointments cannot be made.');
       return;
     }
+
+    const mechanicUnavailability = getMechanicUnavailabilityForSelectedDay(techId);
+    if (mechanicUnavailability) {
+      const mechanicName = technicians.find((t) => t.id === techId)?.name || 'This mechanic';
+      const reason = mechanicUnavailability.reason || 'Unavailable';
+      setWarningMessage(`${mechanicName} is marked unavailable (${reason}) on this date.`);
+      return;
+    }
+
+    setWarningMessage('');
 
     // Get the technician name for matching old appointments created before switching to IDs
     const technicianName = technicians.find(t => t.id === techId)?.name;
@@ -652,6 +709,46 @@ function AppointmentsPage() {
     setSelectedDate(new Date()); // Set the date to today's date
   };
 
+  const handleSaveUnavailability = async ({ id, mechanic, startDay, endDay, reason }) => {
+    if (userRole !== 'admin') {
+      alert('Only admins can mark mechanic unavailability.');
+      return;
+    }
+
+    const normalizedStart = new Date(startDay);
+    normalizedStart.setHours(0, 0, 0, 0);
+
+    const normalizedEnd = new Date(endDay);
+    normalizedEnd.setHours(23, 59, 59, 999);
+
+    const payload = {
+      mechanic,
+      startDay: Timestamp.fromDate(normalizedStart),
+      endDay: Timestamp.fromDate(normalizedEnd),
+      reason,
+    };
+
+    if (id) {
+      await updateDoc(doc(firestore, unavailabilityCollectionName, id), payload);
+      setWarningMessage('Mechanic unavailability updated.');
+    } else {
+      await addDoc(collection(firestore, unavailabilityCollectionName), payload);
+      setWarningMessage('Mechanic unavailability saved.');
+    }
+
+    setIsUnavailabilityModalOpen(false);
+  };
+
+  const handleDeleteUnavailability = async (id) => {
+    if (userRole !== 'admin') {
+      alert('Only admins can delete mechanic unavailability.');
+      return;
+    }
+
+    await deleteDoc(doc(firestore, unavailabilityCollectionName, id));
+    setWarningMessage('Mechanic unavailability deleted.');
+  };
+
   const handleCheckIn = (appointmentId) => {
     setAppointments((prevAppointments) =>
       prevAppointments.map((app) =>
@@ -678,6 +775,14 @@ function AppointmentsPage() {
         <button className="today-button" onClick={handleTodayClick}>
           Today
         </button>
+        {userRole === 'admin' && (
+          <button
+            className="today-button unavailable-button"
+            onClick={() => setIsUnavailabilityModalOpen(true)}
+          >
+            Unavailability
+          </button>
+        )}
       </div>
       {warningMessage && <p className="warning-message">{warningMessage}</p>}
       <Calendar
@@ -685,6 +790,7 @@ function AppointmentsPage() {
         onTimeSlotClick={handleTimeSlotClick}
         technicians={technicians}
         onEditTechnician={handleEditTechnician}
+        unavailableByTechId={unavailableByTechId}
       />
       {isModalOpen && (
         <AppointmentModal
@@ -695,6 +801,16 @@ function AppointmentsPage() {
           onClose={() => setIsModalOpen(false)}
           onCheckIn={handleCheckIn}  // Pass the check-in handler
           checkOverlap={checkOverlap} // Check for overlapping appointments
+        />
+      )}
+      {isUnavailabilityModalOpen && (
+        <MechanicUnavailabilityModal
+          technicians={technicians}
+          selectedDate={selectedDate}
+          unavailabilityEntries={unavailability}
+          onSave={handleSaveUnavailability}
+          onDelete={handleDeleteUnavailability}
+          onClose={() => setIsUnavailabilityModalOpen(false)}
         />
       )}
     </div>
