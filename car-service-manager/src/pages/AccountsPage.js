@@ -7,7 +7,6 @@ import { useNavigate } from 'react-router-dom';
 import { FaCheckCircle, FaTimesCircle, FaChevronDown, FaChevronUp, FaFlag } from 'react-icons/fa';
 import { getTechnicianName } from '../utils/technicianUtils';
 import {
-  Alert,
   Box,
   Button,
   Card,
