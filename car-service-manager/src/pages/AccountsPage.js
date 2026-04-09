@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { firestore } from '../firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import Header from '../components/Header/Header';
@@ -6,8 +6,99 @@ import './AccountsPage.css';
 import { useNavigate } from 'react-router-dom';
 import { FaCheckCircle, FaTimesCircle, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import { getTechnicianName } from '../utils/technicianUtils';
-
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Container,
+  Grid,
+  MenuItem,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Divider,
+} from '@mui/material';
 import { Collapse } from 'react-collapse';
+
+// Memoized Table Row Component
+const AccountTableRow = memo(({ account, onViewHistory }) => (
+  <TableRow className="accounts-table-row">
+    <TableCell>{account.vehicleReg}</TableCell>
+    <TableCell>{account.customerName}</TableCell>
+    <TableCell>{account.customerPhone}</TableCell>
+    <TableCell>{account.vehicleMake}</TableCell>
+    <TableCell align="center">
+      <Button
+        variant="contained"
+        size="small"
+        onClick={() => onViewHistory(account.vehicleReg)}
+        className="accounts-primary-btn"
+      >
+        History
+      </Button>
+    </TableCell>
+  </TableRow>
+));
+
+// Memoized Appointment Entry Component
+const AppointmentEntry = memo(({ appointment, onToggle }) => (
+  <Box className="accounts-appointment-entry">
+    <Box
+      className="accounts-appointment-summary"
+      onClick={() => onToggle(appointment.id)}
+    >
+      <Box className="accounts-summary-row">
+        <Typography variant="body2" className="accounts-summary-text">
+          <strong>Date:</strong> {appointment.formattedDateTime}
+        </Typography>
+        <span className="accounts-toggle-icon">
+          {appointment.isOpen ? <FaChevronUp /> : <FaChevronDown />}
+        </span>
+      </Box>
+    </Box>
+    <Collapse isOpened={appointment.isOpen}>
+      <Box className="accounts-appointment-details">
+        <Divider sx={{ my: 1 }} />
+        <Typography variant="body2" sx={{ mt: 2, mb: 1 }}>
+          <strong>Technician:</strong> {appointment.technicianName || appointment.tech || 'Unknown'}
+        </Typography>
+        <Typography variant="body2" sx={{ mb: 1 }}>
+          <strong>Tasks:</strong>
+        </Typography>
+        <Box component="ul" className="accounts-tasks-list">
+          {appointment.details.tasks && appointment.details.tasks.length > 0 ? (
+            appointment.details.tasks.map((task, index) => (
+              <Box component="li" key={index} className="accounts-task-item">
+                {task.completed ? (
+                  <FaCheckCircle color="green" />
+                ) : (
+                  <FaTimesCircle color="red" />
+                )}
+                {' '}
+                {task.text}
+              </Box>
+            ))
+          ) : (
+            <Box component="li">No tasks available</Box>
+          )}
+        </Box>
+        <Typography variant="body2" sx={{ mt: 2 }}>
+          <strong>Comments:</strong> {appointment.details.comments || 'No comments available'}
+        </Typography>
+      </Box>
+    </Collapse>
+  </Box>
+));
 
 const AccountsPage = () => {
   // Determine the domain
@@ -28,10 +119,32 @@ const AccountsPage = () => {
   const [accounts, setAccounts] = useState([]);
   const [searchReg, setSearchReg] = useState('');
   const [searchType, setSearchType] = useState('vehicleReg'); // 'vehicleReg' or 'phone'
-  const [filteredAccounts, setFilteredAccounts] = useState([]);
   const [selectedAccount, setSelectedAccount] = useState(null); // Track selected account
   const [serviceHistory, setServiceHistory] = useState([]);
   const navigate = useNavigate();
+
+  // Memoize filtered accounts to prevent recalculation on every render
+  const filteredAccounts = useMemo(() => {
+    if (searchReg === '') {
+      return [];
+    }
+
+    if (searchType === 'vehicleReg') {
+      return accounts.filter(account =>
+        account.vehicleReg.toUpperCase().includes(searchReg.toUpperCase())
+      );
+    } else if (searchType === 'phone') {
+      return accounts.filter(account =>
+        account.customerPhone.includes(searchReg)
+      );
+    }
+    return [];
+  }, [searchReg, searchType, accounts]);
+
+  // Memoize the display list (either all accounts or filtered)
+  const displayAccounts = useMemo(() => {
+    return searchReg === '' ? accounts : filteredAccounts;
+  }, [searchReg, accounts, filteredAccounts]);
 
   // Fetch the user role from sessionStorage
   useEffect(() => {
@@ -54,34 +167,17 @@ const AccountsPage = () => {
     fetchAccounts();
   }, [accountsCollectionName]); // Add accountsCollectionName as a dependency
 
-  const handleSearchChange = (e) => {
-    const value = e.target.value;
-    setSearchReg(value);
+  // Use useCallback to memoize handlers
+  const handleSearchChange = useCallback((e) => {
+    setSearchReg(e.target.value);
+  }, []);
 
-    if (value === '') {
-      setFilteredAccounts([]);
-    } else {
-      if (searchType === 'vehicleReg') {
-        const filtered = accounts.filter(account =>
-          account.vehicleReg.toUpperCase().includes(value.toUpperCase())
-        );
-        setFilteredAccounts(filtered);
-      } else if (searchType === 'phone') {
-        const filtered = accounts.filter(account =>
-          account.customerPhone.includes(value)
-        );
-        setFilteredAccounts(filtered);
-      }
-    }
-  };
-
-  const handleSearchTypeChange = (e) => {
+  const handleSearchTypeChange = useCallback((e) => {
     setSearchType(e.target.value);
     setSearchReg('');
-    setFilteredAccounts([]);
-  };
+  }, []);
 
-  const handleViewServiceHistory = async (vehicleReg) => {
+  const handleViewServiceHistory = useCallback(async (vehicleReg) => {
     const appointmentsRef = collection(firestore, `appointments${locationSuffix}`);
     const q = query(appointmentsRef, where('details.vehicleReg', '==', vehicleReg));
     const querySnapshot = await getDocs(q);
@@ -122,125 +218,125 @@ const AccountsPage = () => {
 
     setSelectedAccount(vehicleReg);
     setServiceHistory(appointmentsList);
-  };
+  }, [locationSuffix]);
+
+  // Memoize appointment toggle handler
+  const handleToggleAppointment = useCallback((appointmentId) => {
+    setServiceHistory(prev =>
+      prev.map(app =>
+        app.id === appointmentId
+          ? { ...app, isOpen: !app.isOpen }
+          : app
+      )
+    );
+  }, []);
 
   return (
-    <div className="accounts-page">
+    <div className="accounts-page-shell">
       <Header />
-      <h1>Accounts</h1>
+      <Container maxWidth="lg" className="accounts-page">
+        {/* Search Card */}
+        <Card className="accounts-surface-card accounts-search-card">
+          <CardContent>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} sm={6} md={3}>
+                <Typography className="accounts-filter-label">Search By</Typography>
+                <TextField
+                  select
+                  fullWidth
+                  value={searchType}
+                  onChange={handleSearchTypeChange}
+                  variant="outlined"
+                  size="small"
+                  className="accounts-search-select"
+                >
+                  <MenuItem value="vehicleReg">Vehicle Reg</MenuItem>
+                  <MenuItem value="phone">Phone Number</MenuItem>
+                </TextField>
+              </Grid>
+              <Grid item xs={12} sm={6} md={9}>
+                <Typography className="accounts-filter-label">Query</Typography>
+                <TextField
+                  fullWidth
+                  type="text"
+                  placeholder={searchType === 'vehicleReg' ? 'Search by Vehicle Reg' : 'Search by Phone Number'}
+                  value={searchReg}
+                  onChange={handleSearchChange}
+                  variant="outlined"
+                  size="small"
+                />
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
 
-      <div className="search-box">
-        <select value={searchType} onChange={handleSearchTypeChange} className="search-type-dropdown">
-          <option value="vehicleReg">Vehicle Reg</option>
-          <option value="phone">Phone Number</option>
-        </select>
-        <input
-          type="text"
-          placeholder={searchType === 'vehicleReg' ? 'Search by Vehicle Reg' : 'Search by Phone Number'}
-          value={searchReg}
-          onChange={handleSearchChange}
-        />
-      </div>
+        {/* Results Table Card */}
+        <Card className="accounts-surface-card accounts-table-card">
+          <CardContent>
+            <Box className="accounts-table-header">
+              <Typography variant="h6" className="accounts-section-title">
+                Accounts List
+              </Typography>
+              <Typography variant="body2" className="accounts-results-count">
+                {displayAccounts.length} accounts
+              </Typography>
+            </Box>
+            <TableContainer className="accounts-table-container">
+              <Table>
+                <TableHead>
+                  <TableRow className="accounts-table-header-row">
+                    <TableCell>Vehicle Reg</TableCell>
+                    <TableCell>Customer Name</TableCell>
+                    <TableCell>Customer Phone</TableCell>
+                    <TableCell>Vehicle Make</TableCell>
+                    <TableCell align="center">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {displayAccounts.map(account => (
+                    <AccountTableRow
+                      key={account.id}
+                      account={account}
+                      onViewHistory={handleViewServiceHistory}
+                    />
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </CardContent>
+        </Card>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Vehicle Reg</th>
-            <th>Customer Name</th>
-            <th>Customer Phone</th>
-            <th>Vehicle Make</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {searchReg === '' ? accounts.map(account => (
-            <tr key={account.vehicleReg}>
-              <td>{account.vehicleReg}</td>
-              <td>{account.customerName}</td>
-              <td>{account.customerPhone}</td>
-              <td>{account.vehicleMake}</td>
-              <td>
-                <button onClick={() => handleViewServiceHistory(account.vehicleReg)}>
-                  History
-                </button>
-              </td>
-            </tr>
-          )) : filteredAccounts.map(account => (
-            <tr key={account.vehicleReg}>
-              <td>{account.vehicleReg}</td>
-              <td>{account.customerName}</td>
-              <td>{account.customerPhone}</td>
-              <td>{account.vehicleMake}</td>
-              <td>
-                <button onClick={() => handleViewServiceHistory(account.vehicleReg)}>
-                  History
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {selectedAccount && (
-        <>
-          <div className="modal-overlay" onClick={() => setSelectedAccount(null)}></div>
-          <div className="service-history-modal">
-            <h2>Service History for {selectedAccount}</h2>
-            <div className="service-history-list">
-              {serviceHistory.length > 0 ? (
-                serviceHistory.map(appointment => (
-                  <div key={appointment.id} className="appointment-entry">
-                    <div
-                      className="appointment-summary"
-                      onClick={() =>
-                        setServiceHistory(prev =>
-                          prev.map(app =>
-                            app.id === appointment.id
-                              ? { ...app, isOpen: !app.isOpen }
-                              : app
-                          )
-                        )
-                      }
-                    >
-                      <strong>Date:</strong> {appointment.formattedDateTime}
-                      <span className="toggle-icon">
-                        {appointment.isOpen ? <FaChevronUp /> : <FaChevronDown />}
-                      </span>
-                    </div>
-                    <Collapse isOpened={appointment.isOpen}>
-                      <div className="appointment-details">
-                        <strong>Technician:</strong> {appointment.technicianName || appointment.tech || 'Unknown'} <br />
-                        <strong>Tasks:</strong>
-                        <ul>
-                          {appointment.details.tasks && appointment.details.tasks.length > 0 ? (
-                            appointment.details.tasks.map((task, index) => (
-                              <li key={index}>
-                                {task.completed ? (
-                                  <FaCheckCircle color="green" />
-                                ) : (
-                                  <FaTimesCircle color="red" />
-                                )}
-                                {' '}
-                                {task.text}
-                              </li>
-                            ))
-                          ) : (
-                            <li>No tasks available</li>
-                          )}
-                        </ul>
-                        <strong>Comments: </strong> {appointment.details.comments || 'No comments available'}
-                      </div>
-                    </Collapse>
-                  </div>
-                ))
-              ) : (
-                <p>No service history available for this vehicle.</p>
-              )}
-            </div>
-            <button onClick={() => setSelectedAccount(null)}>Close</button>
-          </div>
-        </>
-      )}
+        {/* Service History Modal */}
+        <Dialog
+          open={selectedAccount !== null}
+          onClose={() => setSelectedAccount(null)}
+          maxWidth="sm"
+          fullWidth
+          className="accounts-modal"
+        >
+          <DialogTitle className="accounts-modal-title">
+            Service History for {selectedAccount}
+          </DialogTitle>
+          <DialogContent dividers className="accounts-modal-content">
+            {serviceHistory.length > 0 ? (
+              serviceHistory.map(appointment => (
+                <AppointmentEntry
+                  key={appointment.id}
+                  appointment={appointment}
+                  onToggle={handleToggleAppointment}
+                />
+              ))
+            ) : (
+              <Typography>No service history available for this vehicle.</Typography>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setSelectedAccount(null)} variant="contained">
+              Close
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </Container>
     </div>
   );
 };

@@ -1,152 +1,263 @@
-/* General styling for the Accounts Page */
+/* Accounts Page Shell - Main background */
+.accounts-page-shell {
+  min-height: 100vh;
+  background: #f4f7fc;
+}
+
+/* Accounts Page Container */
 .accounts-page {
-    font-family: Arial, sans-serif;
-  }
-  
-  h1 {
-    text-align: center;
-    margin-bottom: 20px;
-  }
-  
-  /* Styling the search box */
-  .search-box {
-    display: flex;
-    justify-content: center;
-    margin-bottom: 20px;
-  }
-  
-  .search-box input {
-    padding: 10px;
-    width: 300px;
-    border-radius: 5px;
-    border: 1px solid #ddd;
-    font-size: 16px;
-  }
-  
-  .search-box input:focus {
-    outline: none;
-    border-color: #c23b22;
+  min-height: 60vh;
+  padding: 20px 0;
+}
+
+/* Search Card */
+.accounts-search-card {
+  margin-bottom: 24px;
+  background: #ffffff !important;
+  border-radius: 20px !important;
+  border: 1px solid #e5eaf3 !important;
+  box-shadow: 0 10px 30px rgba(22, 34, 51, 0.06) !important;
+}
+
+.accounts-search-card .MuiCardContent-root {
+  padding: 20px !important;
+}
+
+.accounts-filter-label {
+  margin-bottom: 8px !important;
+  color: #5d6780 !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+.accounts-search-select .MuiOutlinedInput-root {
+  background: #ffffff;
+  border-radius: 10px;
+}
+
+.accounts-search-card .MuiOutlinedInput-notchedOutline {
+  border-color: #d8dfeb !important;
+}
+
+.accounts-search-card .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: #c4cfe0 !important;
+}
+
+.accounts-search-card .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: #9fb1cb !important;
+}
+
+/* Surface Card */
+.accounts-surface-card {
+  background: #ffffff !important;
+  border-radius: 20px !important;
+  border: 1px solid #e5eaf3 !important;
+  box-shadow: 0 10px 30px rgba(22, 34, 51, 0.06) !important;
+}
+
+.accounts-surface-card .MuiCardContent-root {
+  padding: 20px !important;
+}
+
+/* Table Card */
+.accounts-table-card {
+  margin-top: 24px;
+}
+
+.accounts-table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.accounts-section-title {
+  font-weight: 700 !important;
+  color: #1a202c !important;
+}
+
+.accounts-results-count {
+  color: #667089 !important;
+  font-size: 14px !important;
+}
+
+.accounts-table-container {
+  max-height: 560px;
+  overflow: auto;
+  border: 1px solid #e8edf6;
+  border-radius: 14px;
+}
+
+.accounts-table-container table {
+  width: 100%;
+}
+
+.accounts-table-header-row {
+  background-color: #f8fafb !important;
+}
+
+.accounts-table-header-row th {
+  font-weight: 700;
+  color: #344054;
+  background-color: #f8fafb !important;
+  border-bottom: 1px solid #e8edf6 !important;
+  padding: 12px !important;
+}
+
+.accounts-table-row td {
+  padding: 12px !important;
+  border-bottom: 1px solid #e8edf6 !important;
+  color: #5d6780;
+}
+
+.accounts-table-row:hover {
+  background-color: #f9fbff !important;
+}
+
+/* Primary Button */
+.accounts-primary-btn {
+  background-color: #c23b22 !important;
+  color: white !important;
+  text-transform: none !important;
+  font-weight: 600 !important;
+  padding: 6px 16px !important;
+  border-radius: 8px !important;
+  transition: background-color 0.3s ease !important;
+}
+
+.accounts-primary-btn:hover {
+  background-color: #a32e1c !important;
+}
+
+/* Modal */
+.accounts-modal .MuiDialog-paper {
+  border-radius: 20px !important;
+  box-shadow: 0 10px 30px rgba(22, 34, 51, 0.06) !important;
+}
+
+.accounts-modal-title {
+  font-weight: 700 !important;
+  color: #1a202c !important;
+  padding: 20px !important;
+  border-bottom: 1px solid #e5eaf3 !important;
+}
+
+.accounts-modal-content {
+  padding: 20px !important;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+/* Appointment Entry */
+.accounts-appointment-entry {
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid #e5eaf3;
+  border-radius: 12px;
+  background-color: #fafbfd;
+  transition: all 0.2s ease;
+}
+
+.accounts-appointment-entry:hover {
+  background-color: #f5f7fc;
+  border-color: #d8dfeb;
+}
+
+.accounts-appointment-summary {
+  cursor: pointer;
+  user-select: none;
+  padding: 4px;
+}
+
+.accounts-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.accounts-summary-text {
+  color: #344054 !important;
+  font-weight: 500 !important;
+}
+
+.accounts-toggle-icon {
+  color: #5d6780;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+}
+
+/* Appointment Details */
+.accounts-appointment-details {
+  padding: 12px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  margin-top: 8px;
+  color: #5d6780;
+}
+
+.accounts-appointment-details strong {
+  color: #344054;
+  font-weight: 600;
+}
+
+.accounts-tasks-list {
+  list-style: none;
+  padding: 8px 0 !important;
+  margin: 8px 0 !important;
+}
+
+.accounts-task-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  color: #5d6780;
+  font-size: 14px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .accounts-title {
+    font-size: 24px !important;
   }
 
-  .search-type-dropdown {
-    padding: 10px;
-    margin-right: 10px;
-    border-radius: 5px;
-    border: 1px solid #ddd;
-    font-size: 16px;
-    background-color: white;
-    cursor: pointer;
+  .accounts-table-container {
+    max-height: 400px;
   }
 
-  .search-type-dropdown:focus {
-    outline: none;
-    border-color: #c23b22;
+  .accounts-modal .MuiDialog-paper {
+    max-width: 90vw !important;
   }
-  
-  /* Styling the accounts table */
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 40px;
+}
+
+@media (max-width: 480px) {
+  .accounts-page {
+    padding: 12px 0;
   }
-  
-  table th, table td {
-    padding: 12px;
-    text-align: left;
-    border-bottom: 1px solid #ddd;
+
+  .accounts-title {
+    font-size: 20px !important;
   }
-  
-  table th {
-    background-color: #f4f4f4;
-  }
-  
-  table tr:hover {
-    background-color: #f9f9f9;
-  }
-  
-  button {
-    padding: 8px 16px;
-    background-color: #c23b22;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-  }
-  
-  button:hover {
-    background-color: #a32e1c;
-  }
-  
-  /* Service history modal styling */
-  .service-history-modal {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 500px;
-    background-color: #fafafa;
-    padding: 20px;
-    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
-    border-radius: 10px;
-    max-height: 70vh; /* Prevent modal from growing too tall */
-    overflow: auto;
-    display: flex;
+
+  .accounts-table-header {
     flex-direction: column;
-    
+    align-items: flex-start;
   }
 
-  
-  
-  .service-history-modal h2 {
-    font-size: 24px;
-    text-align: center;
-    margin-bottom: 20px;
+  .accounts-table-container {
+    max-height: 300px;
+    font-size: 12px;
   }
-  
-  /* Scrollable service history list */
-  .service-history-list {
-    flex-grow: 1;
-    overflow-y: auto;
-    padding-right: 10px; /* Space for scrollbar */
+
+  .accounts-table-row td {
+    padding: 8px !important;
   }
-  
-  .service-history-list li {
-    padding: 10px;
-    border-bottom: 1px solid #ddd;
-  }
-  
-  .service-history-list li:last-child {
-    border-bottom: none;
-  }
-  
-  /* Expandable description */
-  .description-preview {
-    display: inline-block;
-    max-width: 100%;
-  }
-  
-  .read-more {
-    color: #c23b22;
-    cursor: pointer;
-    text-decoration: underline;
-  }
-  
-  .service-history-modal button {
-    margin-top: 20px;
-    padding: 10px 20px;
-    background-color: #c23b22;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    align-self: center;
-  }
-  
-  .service-history-modal button:hover {
-    background-color: #a32e1c;
-  }
+}
   
   /* Overlay behind the modal */
   .modal-overlay {
