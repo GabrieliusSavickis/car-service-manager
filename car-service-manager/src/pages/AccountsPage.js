@@ -1,17 +1,20 @@
 import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { firestore } from '../firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
 import Header from '../components/Header/Header';
 import './AccountsPage.css';
 import { useNavigate } from 'react-router-dom';
-import { FaCheckCircle, FaTimesCircle, FaChevronDown, FaChevronUp } from 'react-icons/fa';
+import { FaCheckCircle, FaTimesCircle, FaChevronDown, FaChevronUp, FaFlag } from 'react-icons/fa';
 import { getTechnicianName } from '../utils/technicianUtils';
 import {
+  Alert,
   Box,
   Button,
   Card,
   CardContent,
+  Checkbox,
   Container,
+  FormControlLabel,
   Grid,
   MenuItem,
   Table,
@@ -21,6 +24,7 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
   Dialog,
   DialogTitle,
@@ -31,21 +35,40 @@ import {
 import { Collapse } from 'react-collapse';
 
 // Memoized Table Row Component
-const AccountTableRow = memo(({ account, onViewHistory }) => (
+const AccountTableRow = memo(({ account, onViewHistory, onEdit }) => (
   <TableRow className="accounts-table-row">
-    <TableCell>{account.vehicleReg}</TableCell>
+    <TableCell>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        {account.flagged && (
+          <Tooltip title="Flagged Account">
+            <span className="accounts-flag-icon"><FaFlag /></span>
+          </Tooltip>
+        )}
+        {account.vehicleReg}
+      </Box>
+    </TableCell>
     <TableCell>{account.customerName}</TableCell>
     <TableCell>{account.customerPhone}</TableCell>
     <TableCell>{account.vehicleMake}</TableCell>
     <TableCell align="center">
-      <Button
-        variant="contained"
-        size="small"
-        onClick={() => onViewHistory(account.vehicleReg)}
-        className="accounts-primary-btn"
-      >
-        History
-      </Button>
+      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={() => onEdit(account)}
+          className="accounts-edit-btn"
+        >
+          Edit
+        </Button>
+        <Button
+          variant="contained"
+          size="small"
+          onClick={() => onViewHistory(account.vehicleReg)}
+          className="accounts-primary-btn"
+        >
+          History
+        </Button>
+      </Box>
     </TableCell>
   </TableRow>
 ));
@@ -121,6 +144,9 @@ const AccountsPage = () => {
   const [searchType, setSearchType] = useState('vehicleReg'); // 'vehicleReg' or 'phone'
   const [selectedAccount, setSelectedAccount] = useState(null); // Track selected account
   const [serviceHistory, setServiceHistory] = useState([]);
+  const [editingAccount, setEditingAccount] = useState(null); // Account being edited
+  const [editFields, setEditFields] = useState({}); // Edit form values
+  const [editSaving, setEditSaving] = useState(false);
   const navigate = useNavigate();
 
   // Memoize filtered accounts to prevent recalculation on every render
@@ -231,6 +257,48 @@ const AccountsPage = () => {
     );
   }, []);
 
+  const handleEditOpen = useCallback((account) => {
+    setEditingAccount(account);
+    setEditFields({
+      customerName: account.customerName || '',
+      customerPhone: account.customerPhone || '',
+      vehicleMake: account.vehicleMake || '',
+      flagged: account.flagged || false,
+    });
+  }, []);
+
+  const handleEditFieldChange = useCallback((e) => {
+    const { name, value, type, checked } = e.target;
+    setEditFields(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+  }, []);
+
+  const handleEditSave = useCallback(async () => {
+    if (!editingAccount) return;
+    setEditSaving(true);
+    try {
+      const accountRef = doc(firestore, accountsCollectionName, editingAccount.id);
+      await updateDoc(accountRef, {
+        customerName: editFields.customerName,
+        customerPhone: editFields.customerPhone,
+        vehicleMake: editFields.vehicleMake,
+        flagged: editFields.flagged,
+      });
+      // Update local state
+      setAccounts(prev =>
+        prev.map(a =>
+          a.id === editingAccount.id
+            ? { ...a, ...editFields }
+            : a
+        )
+      );
+      setEditingAccount(null);
+    } catch (err) {
+      console.error('Error updating account:', err);
+    } finally {
+      setEditSaving(false);
+    }
+  }, [editingAccount, editFields, accountsCollectionName]);
+
   return (
     <div className="accounts-page-shell">
       <Header />
@@ -298,6 +366,7 @@ const AccountsPage = () => {
                       key={account.id}
                       account={account}
                       onViewHistory={handleViewServiceHistory}
+                      onEdit={handleEditOpen}
                     />
                   ))}
                 </TableBody>
@@ -333,6 +402,114 @@ const AccountsPage = () => {
           <DialogActions>
             <Button onClick={() => setSelectedAccount(null)} variant="contained">
               Close
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Edit Account Modal */}
+        <Dialog
+          open={editingAccount !== null}
+          onClose={() => setEditingAccount(null)}
+          maxWidth="xs"
+          fullWidth
+          className="accounts-modal"
+        >
+          <DialogTitle className="accounts-modal-title">
+            Edit Account
+          </DialogTitle>
+          <DialogContent dividers className="accounts-modal-content">
+            {/* Read-only vehicle reg */}
+            <Box sx={{ mb: 2 }}>
+              <Typography className="accounts-filter-label" sx={{ mb: 0.5 }}>
+                Vehicle Reg
+              </Typography>
+              <TextField
+                fullWidth
+                value={editingAccount?.vehicleReg || ''}
+                variant="outlined"
+                size="small"
+                disabled
+                helperText="Vehicle registration cannot be changed"
+                className="accounts-edit-reg-field"
+              />
+            </Box>
+            <Box sx={{ mb: 2 }}>
+              <Typography className="accounts-filter-label" sx={{ mb: 0.5 }}>
+                Vehicle Make
+              </Typography>
+              <TextField
+                fullWidth
+                name="vehicleMake"
+                value={editFields.vehicleMake || ''}
+                onChange={handleEditFieldChange}
+                variant="outlined"
+                size="small"
+              />
+            </Box>
+            <Box sx={{ mb: 2 }}>
+              <Typography className="accounts-filter-label" sx={{ mb: 0.5 }}>
+                Customer Name
+              </Typography>
+              <TextField
+                fullWidth
+                name="customerName"
+                value={editFields.customerName || ''}
+                onChange={handleEditFieldChange}
+                variant="outlined"
+                size="small"
+              />
+            </Box>
+            <Box sx={{ mb: 2 }}>
+              <Typography className="accounts-filter-label" sx={{ mb: 0.5 }}>
+                Customer Phone
+              </Typography>
+              <TextField
+                fullWidth
+                name="customerPhone"
+                value={editFields.customerPhone || ''}
+                onChange={handleEditFieldChange}
+                variant="outlined"
+                size="small"
+              />
+            </Box>
+            <Divider sx={{ my: 2 }} />
+            <Box className={`accounts-flag-section${editFields.flagged ? ' accounts-flag-section--active' : ''}`}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    name="flagged"
+                    checked={editFields.flagged || false}
+                    onChange={handleEditFieldChange}
+                    className="accounts-flag-checkbox"
+                  />
+                }
+                label={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <FaFlag className={editFields.flagged ? 'accounts-flag-icon--active' : 'accounts-flag-icon--inactive'} />
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
+                        Flag this account
+                      </Typography>
+                      <Typography variant="caption" className="accounts-flag-caption">
+                        A warning will appear in the appointment modal when this vehicle reg is entered
+                      </Typography>
+                    </Box>
+                  </Box>
+                }
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setEditingAccount(null)} variant="outlined" className="accounts-cancel-btn">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleEditSave}
+              variant="contained"
+              disabled={editSaving}
+              className="accounts-primary-btn"
+            >
+              {editSaving ? 'Saving...' : 'Save Changes'}
             </Button>
           </DialogActions>
         </Dialog>

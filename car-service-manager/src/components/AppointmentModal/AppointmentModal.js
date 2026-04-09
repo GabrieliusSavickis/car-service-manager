@@ -78,6 +78,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   const [newTime, setNewTime] = useState('');
   const [initialComments, setInitialComments] = useState('');
   const [vehicleRegLookupStatus, setVehicleRegLookupStatus] = useState('');
+  const [isFlaggedAccount, setIsFlaggedAccount] = useState(false);
   const [technicians, setTechnicians] = useState([]);
   const [loadingTechnicians, setLoadingTechnicians] = useState(true);
 
@@ -116,12 +117,27 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       setFormData({ ...initialFormData, ...convertedDetails });
       console.log('Loaded appointment details with converted dates:', convertedDetails);
       setInitialComments(appointment.details.comments || '');
+
+      // Check if the account is flagged when opening an existing appointment
+      const vehicleReg = convertedDetails.vehicleReg;
+      if (vehicleReg) {
+        const accountsCollection = collection(firestore, accountsCollectionName);
+        const q = query(accountsCollection, where('vehicleReg', '==', vehicleReg));
+        getDocs(q).then((querySnapshot) => {
+          if (!querySnapshot.empty) {
+            setIsFlaggedAccount(querySnapshot.docs[0].data().flagged === true);
+          } else {
+            setIsFlaggedAccount(false);
+          }
+        });
+      }
     } else {
       // New appointment
       setFormData({ ...initialFormData });
       setInitialComments('');
+      setIsFlaggedAccount(false);
     }
-  }, [appointment]);
+  }, [appointment, accountsCollectionName]);
 
   // Load technicians from Firestore
   useEffect(() => {
@@ -458,6 +474,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
             customerPhone: accountData.customerPhone || '',
             mileage: accountData.mileage || '', // Populate mileage
           }));
+          setIsFlaggedAccount(accountData.flagged === true);
           setVehicleRegLookupStatus('Vehicle details loaded.');
         } else {
           // If no match is found, clear the account detail fields
@@ -468,6 +485,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
             customerPhone: '',
             mileage: '', // Clear mileage
           }));
+          setIsFlaggedAccount(false);
           setVehicleRegLookupStatus('No matching vehicle found.');
         }
       }
@@ -537,6 +555,16 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
               {formData.completionTime && (
                 <p>Completed at: {formData.completionTime.toLocaleString()}</p>
               )}
+            </div>
+          )}
+
+          {isFlaggedAccount && (
+            <div className="flagged-account-warning">
+              <span className="flagged-account-warning__icon">⚑</span>
+              <div>
+                <strong>Flagged Account</strong>
+                <p>This vehicle registration has been flagged. Please proceed with caution.</p>
+              </div>
             </div>
           )}
 

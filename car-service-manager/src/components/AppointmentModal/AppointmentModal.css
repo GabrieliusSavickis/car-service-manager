@@ -76,6 +76,41 @@ form button:hover {
   margin-bottom: 20px;
 }
 
+/* Flagged account warning banner */
+.flagged-account-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #fff0ee;
+  border: 1.5px solid #e87b6a;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  color: #7a2315;
+}
+
+.flagged-account-warning__icon {
+  font-size: 22px;
+  color: #c23b22;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.flagged-account-warning strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 2px;
+  color: #7a2315;
+}
+
+.flagged-account-warning p {
+  margin: 0;
+  font-size: 13px;
+  color: #a04030;
+}
+
 .todo-list {
   list-style-type: none;
   padding: 0;

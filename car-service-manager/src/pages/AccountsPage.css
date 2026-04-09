@@ -118,6 +118,81 @@
   background-color: #f9fbff !important;
 }
 
+/* Edit Button */
+.accounts-edit-btn {
+  border-color: #c4cfe0 !important;
+  color: #344054 !important;
+  text-transform: none !important;
+  font-weight: 600 !important;
+  padding: 6px 16px !important;
+  border-radius: 8px !important;
+}
+
+.accounts-edit-btn:hover {
+  border-color: #9fb1cb !important;
+  background: #f5f8fc !important;
+}
+
+.accounts-cancel-btn {
+  border-color: #c4cfe0 !important;
+  color: #344054 !important;
+  text-transform: none !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+}
+
+.accounts-cancel-btn:hover {
+  border-color: #9fb1cb !important;
+  background: #f5f8fc !important;
+}
+
+/* Flag icon in table */
+.accounts-flag-icon {
+  color: #c23b22;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+}
+
+/* Edit modal - disabled reg field */
+.accounts-edit-reg-field .MuiInputBase-root {
+  background: #f4f7fc !important;
+  color: #8a9ab5 !important;
+}
+
+/* Flag section in edit modal */
+.accounts-flag-section {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #e5eaf3;
+  background: #fafbfd;
+  transition: all 0.2s ease;
+}
+
+.accounts-flag-section--active {
+  border-color: #f5c6c0;
+  background: #fff5f4;
+}
+
+.accounts-flag-caption {
+  color: #8a9ab5 !important;
+  font-size: 11px !important;
+  display: block;
+  margin-top: 2px;
+}
+
+.accounts-flag-icon--active {
+  color: #c23b22;
+}
+
+.accounts-flag-icon--inactive {
+  color: #b0bec5;
+}
+
+.accounts-flag-section--active .accounts-flag-caption {
+  color: #a85040 !important;
+}
+
 /* Primary Button */
 .accounts-primary-btn {
   background-color: #c23b22 !important;
