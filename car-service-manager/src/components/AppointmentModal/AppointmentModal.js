@@ -64,6 +64,25 @@ const getFlagReasonText = (flaggedReason) => {
   return FLAG_REASON_LABELS[flaggedReason] || flaggedReason;
 };
 
+const RESCHEDULE_WORKDAY_START_HOUR = 9;
+const RESCHEDULE_WORKDAY_END_HOUR = 18;
+const RESCHEDULE_TIME_OPTIONS = Array.from({ length: (RESCHEDULE_WORKDAY_END_HOUR - RESCHEDULE_WORKDAY_START_HOUR) * 2 + 1 }, (_, index) => {
+  const totalMinutes = RESCHEDULE_WORKDAY_START_HOUR * 60 + index * 30;
+  const hours = String(Math.floor(totalMinutes / 60)).padStart(2, '0');
+  const minutes = String(totalMinutes % 60).padStart(2, '0');
+  return `${hours}:${minutes}`;
+});
+
+const isValidRescheduleTime = (time) => RESCHEDULE_TIME_OPTIONS.includes(time);
+
+const getSafeRescheduleTime = (time) => {
+  if (isValidRescheduleTime(time)) {
+    return time;
+  }
+
+  return RESCHEDULE_TIME_OPTIONS[0];
+};
+
 function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, startTime }) {
 
   // Determine the domain
@@ -446,10 +465,28 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
 
   const handleReschedule = () => {
     // Open the reschedule modal
+    const initialRescheduleTechId = appointment.techId || appointment.tech || '';
+    const appointmentDate = appointment.date ? new Date(appointment.date) : new Date();
+    const isValidDate = !Number.isNaN(appointmentDate.getTime());
+    const formattedDate = isValidDate ? appointmentDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+
+    setNewTechnicianId(initialRescheduleTechId);
+    setNewDate(formattedDate);
+    setNewTime(getSafeRescheduleTime(appointment.startTime));
     setIsRescheduleModalOpen(true);
   };
 
   const handleRescheduleSubmit = () => {
+    if (!newTechnicianId || !newDate || !newTime) {
+      alert('Please select a technician, date, and time to reschedule.');
+      return;
+    }
+
+    if (!isValidRescheduleTime(newTime)) {
+      alert('Please select a valid time between 09:00 and 18:00 in 30-minute intervals.');
+      return;
+    }
+
     // Format the date to match the original format
     const formattedDate = new Date(newDate).toDateString(); // Converts to "Wed Sep 25 2024"
 
@@ -777,11 +814,14 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
               </label>
               <label>
                 Time:
-                <input
-                  type="time"
+                <select
                   value={newTime}
                   onChange={(e) => setNewTime(e.target.value)}
-                />
+                >
+                  {RESCHEDULE_TIME_OPTIONS.map((timeOption) => (
+                    <option key={timeOption} value={timeOption}>{timeOption}</option>
+                  ))}
+                </select>
               </label>
               <button onClick={handleRescheduleSubmit}>Reschedule</button>
               <button onClick={() => setIsRescheduleModalOpen(false)}>Cancel</button>
