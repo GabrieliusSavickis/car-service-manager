@@ -33,6 +33,17 @@ import {
 } from '@mui/material';
 import { Collapse } from 'react-collapse';
 
+const FLAG_REASON_OPTIONS = [
+  { value: 'payment_overdue', label: 'Payment overdue' },
+  { value: 'payment_issues', label: 'Payment issues' },
+  { value: 'problematic_client', label: 'Problematic client' },
+];
+
+const getFlagReasonLabel = (reasonValue) => {
+  const match = FLAG_REASON_OPTIONS.find((option) => option.value === reasonValue);
+  return match ? match.label : '';
+};
+
 // Memoized Table Row Component
 const AccountTableRow = memo(({ account, onViewHistory, onEdit }) => (
   <TableRow className="accounts-table-row">
@@ -263,12 +274,23 @@ const AccountsPage = () => {
       customerPhone: account.customerPhone || '',
       vehicleMake: account.vehicleMake || '',
       flagged: account.flagged || false,
+      flaggedReason: account.flaggedReason || '',
     });
   }, []);
 
   const handleEditFieldChange = useCallback((e) => {
     const { name, value, type, checked } = e.target;
-    setEditFields(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    setEditFields((prev) => {
+      if (type === 'checkbox' && name === 'flagged') {
+        return {
+          ...prev,
+          flagged: checked,
+          flaggedReason: checked ? prev.flaggedReason : '',
+        };
+      }
+
+      return { ...prev, [name]: type === 'checkbox' ? checked : value };
+    });
   }, []);
 
   const handleEditSave = useCallback(async () => {
@@ -281,6 +303,7 @@ const AccountsPage = () => {
         customerPhone: editFields.customerPhone,
         vehicleMake: editFields.vehicleMake,
         flagged: editFields.flagged,
+        flaggedReason: editFields.flagged ? editFields.flaggedReason || '' : '',
       });
       // Update local state
       setAccounts(prev =>
@@ -496,6 +519,34 @@ const AccountsPage = () => {
                   </Box>
                 }
               />
+              <Box sx={{ mt: 1, ml: 4 }}>
+                <TextField
+                  select
+                  fullWidth
+                  name="flaggedReason"
+                  label="Flag reason"
+                  value={editFields.flaggedReason || ''}
+                  onChange={handleEditFieldChange}
+                  size="small"
+                  disabled={!editFields.flagged}
+                  helperText={
+                    editFields.flagged
+                      ? 'Shown in appointment warning notices for this vehicle'
+                      : 'Enable account flagging to select a reason'
+                  }
+                >
+                  {FLAG_REASON_OPTIONS.map((option) => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Box>
+              {editFields.flagged && editFields.flaggedReason && (
+                <Typography variant="caption" className="accounts-flag-caption" sx={{ ml: 4, mt: 1, display: 'block' }}>
+                  This account was flagged because of {getFlagReasonLabel(editFields.flaggedReason)}.
+                </Typography>
+              )}
             </Box>
           </DialogContent>
           <DialogActions>
@@ -505,7 +556,7 @@ const AccountsPage = () => {
             <Button
               onClick={handleEditSave}
               variant="contained"
-              disabled={editSaving}
+              disabled={editSaving || (editFields.flagged && !editFields.flaggedReason)}
               className="accounts-primary-btn"
             >
               {editSaving ? 'Saving...' : 'Save Changes'}

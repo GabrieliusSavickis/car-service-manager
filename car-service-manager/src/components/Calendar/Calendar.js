@@ -1,7 +1,7 @@
 // src/components/Calendar/Calendar.js
 import React from 'react';
 import './Calendar.css';
-import { FaEdit } from 'react-icons/fa';
+import { FaEdit, FaFlag } from 'react-icons/fa';
 
 // Define time slots excluding lunch
 const timeSlots = [
@@ -17,6 +17,11 @@ const timeSlots = [
 ];
 
 const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician, unavailableByTechId = {} }) => {
+
+  const getFlagReasonText = (reasonValue) => {
+    if (!reasonValue) return '';
+    return reasonValue;
+  };
 
   const getAppointmentDurationSlots = (appointment) => (
     appointment.details.segmentExpectedTime ?? appointment.details.expectedTime
@@ -143,6 +148,11 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
                 );
                 const unavailableReason = unavailableByTechId[tech.id];
                 const isUnavailable = Boolean(unavailableReason);
+                const isFlagged = appointment?.accountFlagged === true;
+                const flaggedReason = getFlagReasonText(appointment?.accountFlaggedReason);
+                const flagTooltip = flaggedReason
+                  ? `Flagged account: ${flaggedReason}`
+                  : 'Flagged account';
                 return (
                   <div
                     key={techIndex}
@@ -151,7 +161,7 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
                   >
                     {appointment && (
                       <div
-                        className="appointment"
+                        className={`appointment${isFlagged ? ' appointment--flagged' : ''}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           onTimeSlotClick(time, tech.id);
@@ -163,7 +173,13 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
                           ),
                           gridRow: `span ${calculateAppointmentSpan(appointment)}`,
                         }}
+                        title={isFlagged ? flagTooltip : undefined}
                       >
+                        {isFlagged && (
+                          <span className="appointment-flag-badge" aria-label={flagTooltip}>
+                            <FaFlag />
+                          </span>
+                        )}
                         {/* Time range in bold */}
                         <div className="appointment-time">
                           <strong>{getAppointmentTimeRange(appointment)}</strong>

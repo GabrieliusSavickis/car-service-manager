@@ -53,6 +53,17 @@ const initialFormData = {
   mileageUpdated: false, // Flag to track if mileage has been updated
 };
 
+const FLAG_REASON_LABELS = {
+  payment_overdue: 'payment overdue',
+  payment_issues: 'payment issues',
+  problematic_client: 'problematic client',
+};
+
+const getFlagReasonText = (flaggedReason) => {
+  if (!flaggedReason) return '';
+  return FLAG_REASON_LABELS[flaggedReason] || flaggedReason;
+};
+
 function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, startTime }) {
 
   // Determine the domain
@@ -79,6 +90,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   const [initialComments, setInitialComments] = useState('');
   const [vehicleRegLookupStatus, setVehicleRegLookupStatus] = useState('');
   const [isFlaggedAccount, setIsFlaggedAccount] = useState(false);
+  const [flaggedReason, setFlaggedReason] = useState('');
   const [technicians, setTechnicians] = useState([]);
   const [loadingTechnicians, setLoadingTechnicians] = useState(true);
 
@@ -125,9 +137,12 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
         const q = query(accountsCollection, where('vehicleReg', '==', vehicleReg));
         getDocs(q).then((querySnapshot) => {
           if (!querySnapshot.empty) {
-            setIsFlaggedAccount(querySnapshot.docs[0].data().flagged === true);
+            const accountData = querySnapshot.docs[0].data();
+            setIsFlaggedAccount(accountData.flagged === true);
+            setFlaggedReason(accountData.flagged === true ? getFlagReasonText(accountData.flaggedReason) : '');
           } else {
             setIsFlaggedAccount(false);
+            setFlaggedReason('');
           }
         });
       }
@@ -136,6 +151,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       setFormData({ ...initialFormData });
       setInitialComments('');
       setIsFlaggedAccount(false);
+      setFlaggedReason('');
     }
   }, [appointment, accountsCollectionName]);
 
@@ -475,6 +491,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
             mileage: accountData.mileage || '', // Populate mileage
           }));
           setIsFlaggedAccount(accountData.flagged === true);
+          setFlaggedReason(accountData.flagged === true ? getFlagReasonText(accountData.flaggedReason) : '');
           setVehicleRegLookupStatus('Vehicle details loaded.');
         } else {
           // If no match is found, clear the account detail fields
@@ -486,6 +503,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
             mileage: '', // Clear mileage
           }));
           setIsFlaggedAccount(false);
+          setFlaggedReason('');
           setVehicleRegLookupStatus('No matching vehicle found.');
         }
       }
@@ -563,7 +581,11 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
               <span className="flagged-account-warning__icon">⚑</span>
               <div>
                 <strong>Flagged Account</strong>
-                <p>This vehicle registration has been flagged. Please proceed with caution.</p>
+                <p>
+                  {flaggedReason
+                    ? `This account was flagged because of ${flaggedReason}.`
+                    : 'This vehicle registration has been flagged. Please proceed with caution.'}
+                </p>
               </div>
             </div>
           )}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Header from '../components/Header/Header';
 import Calendar from '../components/Calendar/Calendar';
 import AppointmentModal from '../components/AppointmentModal/AppointmentModal';
@@ -34,6 +34,41 @@ function AppointmentsPage() {
   const [technicians, setTechnicians] = useState([]);
   const [unavailability, setUnavailability] = useState([]);
   const [isUnavailabilityModalOpen, setIsUnavailabilityModalOpen] = useState(false);
+
+  const enrichAppointmentsWithFlagMeta = useCallback(async (appointmentList) => {
+    if (!appointmentList || appointmentList.length === 0) {
+      return [];
+    }
+
+    const accountsSnapshot = await getDocs(collection(firestore, accountsCollectionName));
+    const flagByVehicleReg = new Map();
+    const reasonMap = {
+      payment_overdue: 'Payment overdue',
+      payment_issues: 'Payment issues',
+      problematic_client: 'Problematic client',
+    };
+
+    accountsSnapshot.forEach((accountDoc) => {
+      const accountData = accountDoc.data();
+      if (accountData.vehicleReg) {
+        flagByVehicleReg.set(accountData.vehicleReg, {
+          flagged: accountData.flagged === true,
+          flaggedReason: reasonMap[accountData.flaggedReason] || accountData.flaggedReason || '',
+        });
+      }
+    });
+
+    return appointmentList.map((appointment) => {
+      const vehicleReg = appointment.details?.vehicleReg;
+      const flagMeta = vehicleReg ? flagByVehicleReg.get(vehicleReg) : null;
+
+      return {
+        ...appointment,
+        accountFlagged: Boolean(flagMeta?.flagged),
+        accountFlaggedReason: flagMeta?.flaggedReason || '',
+      };
+    });
+  }, [accountsCollectionName]);
   
 
   const staticBankHolidays = [
@@ -102,12 +137,13 @@ function AppointmentsPage() {
 
     const fetchAppointments = () => {
       const q = query(collection(firestore, appointmentsCollectionName), where('date', '==', selectedDate.toDateString()));
-      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const unsubscribe = onSnapshot(q, async (querySnapshot) => {
         const fetchedAppointments = [];
         querySnapshot.forEach(doc => {
           fetchedAppointments.push({ id: doc.id, ...doc.data() });
         });
-        setAppointments(fetchedAppointments);
+        const enrichedAppointments = await enrichAppointmentsWithFlagMeta(fetchedAppointments);
+        setAppointments(enrichedAppointments);
       });
 
       return () => unsubscribe(); // Clean up listener on component unmount
@@ -115,7 +151,7 @@ function AppointmentsPage() {
 
     const unsubscribe = fetchAppointments();
     return () => unsubscribe(); // Clean up the real-time listener when the date changes or component unmounts
-  }, [selectedDate, appointmentsCollectionName]);
+  }, [selectedDate, appointmentsCollectionName, enrichAppointmentsWithFlagMeta]);
 
   // Load technicians from Firestore
   useEffect(() => {
