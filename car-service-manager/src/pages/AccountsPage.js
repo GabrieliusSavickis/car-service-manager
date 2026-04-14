@@ -152,6 +152,7 @@ const AccountsPage = () => {
   const [accounts, setAccounts] = useState([]);
   const [searchReg, setSearchReg] = useState('');
   const [searchType, setSearchType] = useState('vehicleReg'); // 'vehicleReg' or 'phone'
+  const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState(null); // Track selected account
   const [serviceHistory, setServiceHistory] = useState([]);
   const [editingAccount, setEditingAccount] = useState(null); // Account being edited
@@ -161,26 +162,36 @@ const AccountsPage = () => {
 
   // Memoize filtered accounts to prevent recalculation on every render
   const filteredAccounts = useMemo(() => {
-    if (searchReg === '') {
-      return [];
+    const hasSearchQuery = searchReg.trim() !== '';
+    let baseAccounts = accounts;
+
+    if (hasSearchQuery) {
+      if (searchType === 'vehicleReg') {
+        baseAccounts = accounts.filter(account =>
+          account.vehicleReg.toUpperCase().includes(searchReg.toUpperCase())
+        );
+      } else if (searchType === 'phone') {
+        baseAccounts = accounts.filter(account =>
+          account.customerPhone.includes(searchReg)
+        );
+      }
     }
 
-    if (searchType === 'vehicleReg') {
-      return accounts.filter(account =>
-        account.vehicleReg.toUpperCase().includes(searchReg.toUpperCase())
-      );
-    } else if (searchType === 'phone') {
-      return accounts.filter(account =>
-        account.customerPhone.includes(searchReg)
-      );
+    if (showFlaggedOnly) {
+      return baseAccounts.filter(account => account.flagged === true);
     }
-    return [];
-  }, [searchReg, searchType, accounts]);
+
+    return baseAccounts;
+  }, [searchReg, searchType, accounts, showFlaggedOnly]);
 
   // Memoize the display list (either all accounts or filtered)
   const displayAccounts = useMemo(() => {
-    return searchReg === '' ? accounts : filteredAccounts;
-  }, [searchReg, accounts, filteredAccounts]);
+    return filteredAccounts;
+  }, [filteredAccounts]);
+
+  const flaggedAccountsCount = useMemo(() => {
+    return accounts.filter((account) => account.flagged === true).length;
+  }, [accounts]);
 
   // Fetch the user role from sessionStorage
   useEffect(() => {
@@ -211,6 +222,10 @@ const AccountsPage = () => {
   const handleSearchTypeChange = useCallback((e) => {
     setSearchType(e.target.value);
     setSearchReg('');
+  }, []);
+
+  const handleToggleFlaggedOnly = useCallback((e) => {
+    setShowFlaggedOnly(e.target.checked);
   }, []);
 
   const handleViewServiceHistory = useCallback(async (vehicleReg) => {
@@ -355,6 +370,27 @@ const AccountsPage = () => {
                   variant="outlined"
                   size="small"
                 />
+              </Grid>
+              <Grid item xs={12}>
+                <Box className="accounts-flagged-filter-row">
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={showFlaggedOnly}
+                        onChange={handleToggleFlaggedOnly}
+                        className="accounts-flag-checkbox"
+                      />
+                    }
+                    label={
+                      <Typography variant="body2" className="accounts-flagged-filter-label">
+                        Show flagged accounts only
+                      </Typography>
+                    }
+                  />
+                  <Typography variant="body2" className="accounts-flagged-filter-count">
+                    {flaggedAccountsCount} flagged
+                  </Typography>
+                </Box>
               </Grid>
             </Grid>
           </CardContent>

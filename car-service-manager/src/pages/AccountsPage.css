@@ -49,6 +49,25 @@
   border-color: #9fb1cb !important;
 }
 
+.accounts-flagged-filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 2px 0;
+  border-top: 1px solid #e8edf6;
+}
+
+.accounts-flagged-filter-label {
+  color: #344054 !important;
+  font-weight: 600 !important;
+}
+
+.accounts-flagged-filter-count {
+  color: #8a9ab5 !important;
+  font-size: 13px !important;
+}
+
 /* Surface Card */
 .accounts-surface-card {
   background: #ffffff !important;
