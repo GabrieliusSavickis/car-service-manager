@@ -49,25 +49,6 @@
   border-color: #9fb1cb !important;
 }
 
-.accounts-flagged-filter-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 4px 2px 0;
-  border-top: 1px solid #e8edf6;
-}
-
-.accounts-flagged-filter-label {
-  color: #344054 !important;
-  font-weight: 600 !important;
-}
-
-.accounts-flagged-filter-count {
-  color: #8a9ab5 !important;
-  font-size: 13px !important;
-}
-
 /* Surface Card */
 .accounts-surface-card {
   background: #ffffff !important;
@@ -102,6 +83,40 @@
 .accounts-results-count {
   color: #667089 !important;
   font-size: 14px !important;
+}
+
+.accounts-results-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.accounts-flag-filter-btn {
+  min-width: auto !important;
+  padding: 4px 8px !important;
+  border-radius: 999px !important;
+  color: #8a9ab5 !important;
+  gap: 6px;
+}
+
+.accounts-flag-filter-btn:hover {
+  background: #f3f6fb !important;
+  color: #5d6780 !important;
+}
+
+.accounts-flag-filter-btn--active {
+  background: #fff1ef !important;
+  color: #c23b22 !important;
+}
+
+.accounts-flag-filter-btn--active:hover {
+  background: #ffe8e3 !important;
+}
+
+.accounts-flag-filter-count {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .accounts-table-container {

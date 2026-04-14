@@ -224,8 +224,8 @@ const AccountsPage = () => {
     setSearchReg('');
   }, []);
 
-  const handleToggleFlaggedOnly = useCallback((e) => {
-    setShowFlaggedOnly(e.target.checked);
+  const handleToggleFlaggedOnly = useCallback(() => {
+    setShowFlaggedOnly((prev) => !prev);
   }, []);
 
   const handleViewServiceHistory = useCallback(async (vehicleReg) => {
@@ -371,27 +371,6 @@ const AccountsPage = () => {
                   size="small"
                 />
               </Grid>
-              <Grid item xs={12}>
-                <Box className="accounts-flagged-filter-row">
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={showFlaggedOnly}
-                        onChange={handleToggleFlaggedOnly}
-                        className="accounts-flag-checkbox"
-                      />
-                    }
-                    label={
-                      <Typography variant="body2" className="accounts-flagged-filter-label">
-                        Show flagged accounts only
-                      </Typography>
-                    }
-                  />
-                  <Typography variant="body2" className="accounts-flagged-filter-count">
-                    {flaggedAccountsCount} flagged
-                  </Typography>
-                </Box>
-              </Grid>
             </Grid>
           </CardContent>
         </Card>
@@ -403,9 +382,23 @@ const AccountsPage = () => {
               <Typography variant="h6" className="accounts-section-title">
                 Accounts List
               </Typography>
-              <Typography variant="body2" className="accounts-results-count">
-                {displayAccounts.length} accounts
-              </Typography>
+              <Box className="accounts-results-controls">
+                <Typography variant="body2" className="accounts-results-count">
+                  {displayAccounts.length} accounts
+                </Typography>
+                <Tooltip title={showFlaggedOnly ? 'Showing flagged accounts' : 'View all flagged accounts'}>
+                  <Button
+                    variant="text"
+                    size="small"
+                    onClick={handleToggleFlaggedOnly}
+                    className={`accounts-flag-filter-btn${showFlaggedOnly ? ' accounts-flag-filter-btn--active' : ''}`}
+                    aria-label="View all flagged accounts"
+                  >
+                    <FaFlag />
+                    <span className="accounts-flag-filter-count">{flaggedAccountsCount}</span>
+                  </Button>
+                </Tooltip>
+              </Box>
             </Box>
             <TableContainer className="accounts-table-container">
               <Table>
