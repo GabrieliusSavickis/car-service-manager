@@ -468,7 +468,13 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     const initialRescheduleTechId = appointment.techId || appointment.tech || '';
     const appointmentDate = appointment.date ? new Date(appointment.date) : new Date();
     const isValidDate = !Number.isNaN(appointmentDate.getTime());
-    const formattedDate = isValidDate ? appointmentDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    const toLocalDateString = (d) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    const formattedDate = isValidDate ? toLocalDateString(appointmentDate) : toLocalDateString(new Date());
 
     setNewTechnicianId(initialRescheduleTechId);
     setNewDate(formattedDate);
