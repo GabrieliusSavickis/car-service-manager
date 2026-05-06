@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './AppointmentModal.css';
 import { FaCircle, FaCheckCircle, FaPrint, FaExchangeAlt } from 'react-icons/fa';
 import { firestore } from '../../firebase';
-import { collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, doc, getDoc, limit } from 'firebase/firestore';
 import PrintableJobCard from '../PrintableJobCard/PrintableJobCard';
 import ReactToPrint from 'react-to-print';
 import { getTechnicians } from '../../utils/technicianUtils';
@@ -118,6 +118,38 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   const taskInputRef = useRef(null);
   const displayTime = appointment.id ? appointment.startTime : startTime;
 
+  const loadAccountByVehicleReg = useCallback(async (vehicleReg) => {
+    if (!vehicleReg) {
+      return null;
+    }
+
+    const normalizedReg = vehicleReg.trim().toUpperCase().replace(/\s+/g, '');
+    const byIdRef = doc(firestore, accountsCollectionName, normalizedReg);
+    const byIdSnapshot = await getDoc(byIdRef);
+
+    if (byIdSnapshot.exists()) {
+      return {
+        data: byIdSnapshot.data(),
+        ref: byIdRef,
+      };
+    }
+
+    const fallbackQuery = query(
+      collection(firestore, accountsCollectionName),
+      where('vehicleReg', '==', normalizedReg),
+      limit(1)
+    );
+    const fallbackSnapshot = await getDocs(fallbackQuery);
+    if (fallbackSnapshot.empty) {
+      return null;
+    }
+
+    return {
+      data: fallbackSnapshot.docs[0].data(),
+      ref: fallbackSnapshot.docs[0].ref,
+    };
+  }, [accountsCollectionName]);
+
   useEffect(() => {
     const role = sessionStorage.getItem('userRole');
     const storedUsername = sessionStorage.getItem('username');
@@ -152,11 +184,9 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       // Check if the account is flagged when opening an existing appointment
       const vehicleReg = convertedDetails.vehicleReg;
       if (vehicleReg) {
-        const accountsCollection = collection(firestore, accountsCollectionName);
-        const q = query(accountsCollection, where('vehicleReg', '==', vehicleReg));
-        getDocs(q).then((querySnapshot) => {
-          if (!querySnapshot.empty) {
-            const accountData = querySnapshot.docs[0].data();
+        loadAccountByVehicleReg(vehicleReg).then((accountResult) => {
+          if (accountResult) {
+            const accountData = accountResult.data;
             setIsFlaggedAccount(accountData.flagged === true);
             setFlaggedReason(accountData.flagged === true ? getFlagReasonText(accountData.flaggedReason) : '');
           } else {
@@ -172,7 +202,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       setIsFlaggedAccount(false);
       setFlaggedReason('');
     }
-  }, [appointment, accountsCollectionName]);
+  }, [appointment, loadAccountByVehicleReg]);
 
   // Load technicians from Firestore
   useEffect(() => {
@@ -429,13 +459,9 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
 
     // Save updated mileage to the vehicle's account
     if (formData.vehicleReg && formData.mileage) {
-      const accountsCollection = collection(firestore, accountsCollectionName);
-      const q = query(accountsCollection, where('vehicleReg', '==', formData.vehicleReg));
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
-        const docRef = querySnapshot.docs[0].ref;
-        await updateDoc(docRef, { mileage: formData.mileage });
+      const accountResult = await loadAccountByVehicleReg(formData.vehicleReg);
+      if (accountResult?.ref) {
+        await updateDoc(accountResult.ref, { mileage: formData.mileage });
       }
       // Optionally, create a new account if it doesn't exist
       // await addDoc(accountsCollection, {
@@ -520,12 +546,10 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
 
       const updatedValue = formData.vehicleReg.trim().toUpperCase().replace(/\s+/g, '');
       if (updatedValue !== '') {
-        const accountsCollection = collection(firestore, accountsCollectionName);
-        const q = query(accountsCollection, where('vehicleReg', '==', updatedValue));
-        const querySnapshot = await getDocs(q);
+        const accountResult = await loadAccountByVehicleReg(updatedValue);
 
-        if (!querySnapshot.empty) {
-          const accountData = querySnapshot.docs[0].data(); // Assuming vehicleReg is unique
+        if (accountResult) {
+          const accountData = accountResult.data;
           setFormData((prev) => ({
             ...prev,
             vehicleMake: accountData.vehicleMake || '',

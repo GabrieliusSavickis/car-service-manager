@@ -2,8 +2,9 @@ import { firestore } from '../firebase';
 import { collection, getDocs } from 'firebase/firestore';
 
 // Cache for technicians to avoid repeated Firestore queries
-let techniciansCache = null;
-let cacheTimestamp = null;
+const techniciansCacheByLocation = new Map();
+const cacheTimestampByLocation = new Map();
+const techniciansInFlightByLocation = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
 
 /**
@@ -12,27 +13,47 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
  * @returns {Promise<Array>} Array of technician objects with id and name
  */
 export const getTechnicians = async (locationSuffix = '') => {
+  const cacheKey = locationSuffix || 'default';
+
   // Check if cache is still valid
-  if (techniciansCache && cacheTimestamp && (Date.now() - cacheTimestamp) < CACHE_DURATION) {
-    return techniciansCache;
+  const cachedTechnicians = techniciansCacheByLocation.get(cacheKey);
+  const cacheTimestamp = cacheTimestampByLocation.get(cacheKey);
+  if (cachedTechnicians && cacheTimestamp && (Date.now() - cacheTimestamp) < CACHE_DURATION) {
+    return cachedTechnicians;
+  }
+
+  // Deduplicate concurrent requests so one refresh only triggers one Firestore read.
+  const inFlightPromise = techniciansInFlightByLocation.get(cacheKey);
+  if (inFlightPromise) {
+    return inFlightPromise;
   }
 
   try {
-    const techniciansCollection = collection(firestore, `technicians${locationSuffix}`);
-    const querySnapshot = await getDocs(techniciansCollection);
-    const technicians = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-    
-    // Sort by order field for display
-    technicians.sort((a, b) => (a.order || 999) - (b.order || 999));
-    
-    // Update cache
-    techniciansCache = technicians;
-    cacheTimestamp = Date.now();
-    
-    return technicians;
+    const loadPromise = (async () => {
+      const techniciansCollection = collection(firestore, `technicians${locationSuffix}`);
+      const querySnapshot = await getDocs(techniciansCollection);
+      const technicians = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      // Sort by order field for display
+      technicians.sort((a, b) => (a.order || 999) - (b.order || 999));
+
+      // Update cache
+      techniciansCacheByLocation.set(cacheKey, technicians);
+      cacheTimestampByLocation.set(cacheKey, Date.now());
+
+      return technicians;
+    })();
+
+    techniciansInFlightByLocation.set(cacheKey, loadPromise);
+
+    try {
+      return await loadPromise;
+    } finally {
+      techniciansInFlightByLocation.delete(cacheKey);
+    }
   } catch (error) {
     console.error('Error fetching technicians:', error);
     return [];
@@ -77,6 +98,7 @@ export const getTechnicianIdByName = async (name, locationSuffix = '') => {
  * Clear the technicians cache (call this when technicians are updated)
  */
 export const clearTechniciansCache = () => {
-  techniciansCache = null;
-  cacheTimestamp = null;
+  techniciansCacheByLocation.clear();
+  cacheTimestampByLocation.clear();
+  techniciansInFlightByLocation.clear();
 };

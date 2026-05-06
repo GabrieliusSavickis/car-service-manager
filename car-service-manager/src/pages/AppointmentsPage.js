@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Header from '../components/Header/Header';
 import Calendar from '../components/Calendar/Calendar';
 import AppointmentModal from '../components/AppointmentModal/AppointmentModal';
 import MechanicUnavailabilityModal from '../components/MechanicUnavailabilityModal/MechanicUnavailabilityModal';
 import { firestore } from '../firebase'; // Import Firestore
-import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, setDoc, onSnapshot, getDocs, getDoc, deleteField, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, setDoc, onSnapshot, getDocs, getDoc, deleteField, Timestamp, limit } from 'firebase/firestore';
 import DatePicker from '../components/DatePicker/DatePicker';
 import './AppointmentsPage.css';
 import { getTechnicians, clearTechniciansCache } from '../utils/technicianUtils';
@@ -34,33 +34,87 @@ function AppointmentsPage() {
   const [technicians, setTechnicians] = useState([]);
   const [unavailability, setUnavailability] = useState([]);
   const [isUnavailabilityModalOpen, setIsUnavailabilityModalOpen] = useState(false);
+  const accountFlagCacheRef = useRef(new Map());
+  const accountFlagInFlightRef = useRef(new Map());
 
-  const enrichAppointmentsWithFlagMeta = useCallback(async (appointmentList) => {
-    if (!appointmentList || appointmentList.length === 0) {
-      return [];
+  useEffect(() => {
+    accountFlagCacheRef.current.clear();
+    accountFlagInFlightRef.current.clear();
+  }, [accountsCollectionName]);
+
+  const fetchAccountFlagMeta = useCallback(async (vehicleReg) => {
+    if (!vehicleReg) {
+      return { flagged: false, flaggedReason: '' };
     }
 
-    const accountsSnapshot = await getDocs(collection(firestore, accountsCollectionName));
-    const flagByVehicleReg = new Map();
     const reasonMap = {
       payment_overdue: 'Payment overdue',
       payment_issues: 'Payment issues',
       problematic_client: 'Problematic client',
     };
 
-    accountsSnapshot.forEach((accountDoc) => {
-      const accountData = accountDoc.data();
-      if (accountData.vehicleReg) {
-        flagByVehicleReg.set(accountData.vehicleReg, {
-          flagged: accountData.flagged === true,
-          flaggedReason: reasonMap[accountData.flaggedReason] || accountData.flaggedReason || '',
-        });
+    if (accountFlagCacheRef.current.has(vehicleReg)) {
+      return accountFlagCacheRef.current.get(vehicleReg);
+    }
+
+    if (accountFlagInFlightRef.current.has(vehicleReg)) {
+      return accountFlagInFlightRef.current.get(vehicleReg);
+    }
+
+    const loadPromise = (async () => {
+      let accountData = null;
+
+      // Primary lookup: account doc id is normalized vehicle registration.
+      const accountByIdSnapshot = await getDoc(doc(firestore, accountsCollectionName, vehicleReg));
+      if (accountByIdSnapshot.exists()) {
+        accountData = accountByIdSnapshot.data();
+      } else {
+        // Legacy fallback for older records where doc id was not the registration.
+        const fallbackQuery = query(
+          collection(firestore, accountsCollectionName),
+          where('vehicleReg', '==', vehicleReg),
+          limit(1)
+        );
+        const fallbackSnapshot = await getDocs(fallbackQuery);
+        if (!fallbackSnapshot.empty) {
+          accountData = fallbackSnapshot.docs[0].data();
+        }
       }
-    });
+
+      const flagMeta = {
+        flagged: accountData?.flagged === true,
+        flaggedReason: reasonMap[accountData?.flaggedReason] || accountData?.flaggedReason || '',
+      };
+
+      accountFlagCacheRef.current.set(vehicleReg, flagMeta);
+      return flagMeta;
+    })();
+
+    accountFlagInFlightRef.current.set(vehicleReg, loadPromise);
+
+    try {
+      return await loadPromise;
+    } finally {
+      accountFlagInFlightRef.current.delete(vehicleReg);
+    }
+  }, [accountsCollectionName]);
+
+  const enrichAppointmentsWithFlagMeta = useCallback(async (appointmentList) => {
+    if (!appointmentList || appointmentList.length === 0) {
+      return [];
+    }
+
+    const uniqueRegs = [...new Set(
+      appointmentList
+        .map((appointment) => appointment.details?.vehicleReg)
+        .filter(Boolean)
+    )];
+
+    await Promise.all(uniqueRegs.map((vehicleReg) => fetchAccountFlagMeta(vehicleReg)));
 
     return appointmentList.map((appointment) => {
       const vehicleReg = appointment.details?.vehicleReg;
-      const flagMeta = vehicleReg ? flagByVehicleReg.get(vehicleReg) : null;
+      const flagMeta = vehicleReg ? accountFlagCacheRef.current.get(vehicleReg) : null;
 
       return {
         ...appointment,
@@ -68,7 +122,7 @@ function AppointmentsPage() {
         accountFlaggedReason: flagMeta?.flaggedReason || '',
       };
     });
-  }, [accountsCollectionName]);
+  }, [fetchAccountFlagMeta]);
   
 
   const staticBankHolidays = [
