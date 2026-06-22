@@ -270,6 +270,48 @@ form button:hover {
   resize: none;
 }
 
+.private-note-section {
+  margin-top: 12px;
+}
+
+.private-note-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background-color: transparent;
+  border: 1.5px solid #9b59b6;
+  border-radius: 50px;
+  color: #9b59b6;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.private-note-toggle:hover {
+  background-color: #9b59b6;
+  color: white;
+}
+
+.private-note-chevron {
+  font-size: 0.65rem;
+  margin-left: 2px;
+}
+
+.private-note-textarea {
+  margin-top: 8px;
+  width: 90%;
+  height: 80px;
+  padding: 8px;
+  border: 1.5px solid #9b59b6;
+  border-radius: 4px;
+  background-color: #fdf5ff;
+  resize: none;
+  font-size: 0.875rem;
+  display: block;
+}
+
 .technician-time-section {
   margin-top: 20px;
   padding: 10px;

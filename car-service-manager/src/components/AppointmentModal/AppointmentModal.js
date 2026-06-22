@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './AppointmentModal.css';
-import { FaCircle, FaCheckCircle, FaPrint, FaExchangeAlt, FaPencilAlt, FaTrash, FaCheck, FaTimes } from 'react-icons/fa';
+import { FaCircle, FaCheckCircle, FaPrint, FaExchangeAlt, FaPencilAlt, FaTrash, FaCheck, FaTimes, FaLock } from 'react-icons/fa';
 import { firestore } from '../../firebase';
 import { collection, query, where, getDocs, updateDoc, doc, getDoc, limit } from 'firebase/firestore';
 import PrintableJobCard from '../PrintableJobCard/PrintableJobCard';
@@ -44,6 +44,7 @@ const initialFormData = {
   totalTimeSpent: null,
   isPaused: false,
   comments: '',
+  privateNote: '',
   technicianTimes: {}, // Stores the total time spent by each technician (keyed by technicianId)
   currentTechnicianId: null, // Track the currently active technician ID
   newCommentsAdded: false, // Include this field as well
@@ -109,6 +110,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   const [newDate, setNewDate] = useState('');
   const [newTime, setNewTime] = useState('');
   const [initialComments, setInitialComments] = useState('');
+  const [showPrivateNote, setShowPrivateNote] = useState(false);
   const [vehicleRegLookupStatus, setVehicleRegLookupStatus] = useState('');
   const [isFlaggedAccount, setIsFlaggedAccount] = useState(false);
   const [flaggedReason, setFlaggedReason] = useState('');
@@ -827,6 +829,29 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
                 placeholder="Add any additional notes here..."
               />
             </div>
+
+            {userRole === 'admin' && (
+              <div className="private-note-section">
+                <button
+                  type="button"
+                  className="private-note-toggle"
+                  onClick={() => setShowPrivateNote((prev) => !prev)}
+                >
+                  <FaLock />
+                  Private Note
+                  <span className="private-note-chevron">{showPrivateNote ? '▲' : '▼'}</span>
+                </button>
+                {showPrivateNote && (
+                  <textarea
+                    className="private-note-textarea"
+                    name="privateNote"
+                    value={formData.privateNote || ''}
+                    onChange={handleChange}
+                    placeholder="Add a private admin note (only visible to admins)..."
+                  />
+                )}
+              </div>
+            )}
           </div>
 
           <div className="button-group">
