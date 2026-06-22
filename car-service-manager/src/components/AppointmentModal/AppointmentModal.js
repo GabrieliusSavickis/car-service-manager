@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './AppointmentModal.css';
-import { FaCircle, FaCheckCircle, FaPrint, FaExchangeAlt } from 'react-icons/fa';
+import { FaCircle, FaCheckCircle, FaPrint, FaExchangeAlt, FaPencilAlt, FaTrash, FaCheck, FaTimes } from 'react-icons/fa';
 import { firestore } from '../../firebase';
 import { collection, query, where, getDocs, updateDoc, doc, getDoc, limit } from 'firebase/firestore';
 import PrintableJobCard from '../PrintableJobCard/PrintableJobCard';
@@ -100,6 +100,8 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
 
   const [formData, setFormData] = useState(initialFormData);
   const [newTask, setNewTask] = useState('');
+  const [editingTaskIndex, setEditingTaskIndex] = useState(null);
+  const [editingTaskText, setEditingTaskText] = useState('');
   const [userRole, setUserRole] = useState('');
   const [username, setUsername] = useState('');
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false); // State for reschedule modal
@@ -416,6 +418,27 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       updatedTasks.splice(index, 1);
       return { ...prev, tasks: updatedTasks };
     });
+  };
+
+  const handleStartEditTask = (index) => {
+    setEditingTaskIndex(index);
+    setEditingTaskText(formData.tasks[index].text);
+  };
+
+  const handleSaveEditTask = (index) => {
+    if (editingTaskText.trim() === '') return;
+    setFormData((prev) => {
+      const updatedTasks = [...prev.tasks];
+      updatedTasks[index] = { ...updatedTasks[index], text: editingTaskText.trim() };
+      return { ...prev, tasks: updatedTasks };
+    });
+    setEditingTaskIndex(null);
+    setEditingTaskText('');
+  };
+
+  const handleCancelEditTask = () => {
+    setEditingTaskIndex(null);
+    setEditingTaskText('');
   };
 
   const handleSubmit = async (e) => {
@@ -748,13 +771,36 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
                     <span className="task-circle" onClick={() => handleToggleTaskCompletion(index)}>
                       {task.completed ? <FaCheckCircle /> : <FaCircle />}
                     </span>
-                    <span className="task-text">{task.text}</span>
-                    {task.completed && (
-                      <span className="completed-by">
-                        (Completed by: {task.completedBy} in {task.timeSpent}m)
-                      </span>
+                    {editingTaskIndex === index ? (
+                      <>
+                        <input
+                          className="task-edit-input"
+                          type="text"
+                          value={editingTaskText}
+                          onChange={(e) => setEditingTaskText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveEditTask(index);
+                            if (e.key === 'Escape') handleCancelEditTask();
+                          }}
+                          autoFocus
+                        />
+                        <button type="button" className="task-save-btn" title="Save" onClick={() => handleSaveEditTask(index)}><FaCheck /></button>
+                        <button type="button" className="task-cancel-btn" title="Cancel" onClick={handleCancelEditTask}><FaTimes /></button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="task-text">{task.text}</span>
+                        {task.completed && (
+                          <span className="completed-by">
+                            (Completed by: {task.completedBy} in {task.timeSpent}m)
+                          </span>
+                        )}
+                        {!task.completed && (
+                          <button type="button" className="task-edit-btn" title="Edit task" onClick={() => handleStartEditTask(index)}><FaPencilAlt /></button>
+                        )}
+                        <button type="button" className="task-delete-btn" title="Delete task" onClick={() => handleDeleteTask(index)}><FaTrash /></button>
+                      </>
                     )}
-                    <button type="button" onClick={() => handleDeleteTask(index)}>Delete</button>
                   </li>
                 ))}
               </ul>

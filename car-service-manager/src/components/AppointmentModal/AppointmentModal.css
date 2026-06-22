@@ -141,6 +141,70 @@ form button:hover {
   color: #777;
 }
 
+.task-edit-input {
+  flex-grow: 1;
+  padding: 4px 8px;
+  border: 1px solid #2297c2;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.task-item button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-left: 6px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.task-item button:hover {
+  transform: scale(1.1);
+}
+
+.task-edit-btn {
+  background-color: #f0a500;
+  color: white;
+}
+
+.task-edit-btn:hover {
+  background-color: #d4920a;
+}
+
+.task-delete-btn {
+  background-color: #e05c5c;
+  color: white;
+}
+
+.task-delete-btn:hover {
+  background-color: #c94444;
+}
+
+.task-save-btn {
+  background-color: #2ecc71;
+  color: white;
+}
+
+.task-save-btn:hover {
+  background-color: #27b560;
+}
+
+.task-cancel-btn {
+  background-color: #aaa;
+  color: white;
+}
+
+.task-cancel-btn:hover {
+  background-color: #888;
+}
+
 .new-task-input {
   display: flex;
   align-items: center;
