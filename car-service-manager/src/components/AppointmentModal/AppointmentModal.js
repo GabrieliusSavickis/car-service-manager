@@ -6,6 +6,12 @@ import { collection, query, where, getDocs, updateDoc, doc, getDoc, limit } from
 import PrintableJobCard from '../PrintableJobCard/PrintableJobCard';
 import ReactToPrint from 'react-to-print';
 import { getTechnicians } from '../../utils/technicianUtils';
+import {
+  PARTS_STATUS,
+  PARTS_STATUS_OPTIONS,
+  formatPartsTimestamp,
+  getPartsStatus,
+} from '../../utils/partsStatus';
 
 const timeOptions = [
   { label: '30 minutes', value: 1 },
@@ -52,6 +58,11 @@ const initialFormData = {
   completionTime: null, // To store the completion time
   mileage: '', // New field for Mileage
   mileageUpdated: false, // Flag to track if mileage has been updated
+  partsStatus: PARTS_STATUS.NONE, // Whether parts are needed/ordered/received
+  partsOrderedAt: null, // When the parts were marked as ordered
+  partsReceivedAt: null, // When the parts were marked as received
+  partsStatusUpdatedBy: null, // Who last changed the parts status
+  partsStatusUpdatedAt: null, // When the parts status was last changed
 };
 
 const FLAG_REASON_LABELS = {
@@ -167,7 +178,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       // Convert any Timestamp fields to Date objects
       const convertedDetails = { ...details };
 
-      const dateFields = ['startTime', 'resumeTime', 'pausedTime', 'checkInTime', 'completionTime']; // List all date fields
+      const dateFields = ['startTime', 'resumeTime', 'pausedTime', 'checkInTime', 'completionTime', 'partsOrderedAt', 'partsReceivedAt', 'partsStatusUpdatedAt']; // List all date fields
 
       dateFields.forEach(field => {
         if (details[field]) {
@@ -258,6 +269,31 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   const handleExpectedTimeChange = (e) => {
     console.log('Selected time value:', e.target.value);
     setFormData((prev) => ({ ...prev, expectedTime: parseInt(e.target.value) }));
+  };
+
+  const handlePartsStatusChange = (nextStatus) => {
+    if (userRole !== 'admin') return;
+
+    setFormData((prev) => {
+      if (getPartsStatus(prev) === nextStatus) return prev;
+
+      const now = new Date();
+      // Keep the ordered stamp once parts are on the way, but drop both stamps if
+      // the job goes back to needing parts or not needing them at all.
+      const keepsOrderedStamp = nextStatus === PARTS_STATUS.ORDERED || nextStatus === PARTS_STATUS.RECEIVED;
+      const orderedAt = keepsOrderedStamp
+        ? (prev.partsOrderedAt || (nextStatus === PARTS_STATUS.ORDERED ? now : null))
+        : null;
+
+      return {
+        ...prev,
+        partsStatus: nextStatus,
+        partsOrderedAt: orderedAt,
+        partsReceivedAt: nextStatus === PARTS_STATUS.RECEIVED ? (prev.partsReceivedAt || now) : null,
+        partsStatusUpdatedBy: username || null,
+        partsStatusUpdatedAt: now,
+      };
+    });
   };
 
   const handleAddTask = () => {
@@ -629,6 +665,24 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     handleModalOpen();
   }, []);
 
+  const partsStatus = getPartsStatus(formData);
+  const partsOrderedAtText = formatPartsTimestamp(formData.partsOrderedAt);
+  const partsReceivedAtText = formatPartsTimestamp(formData.partsReceivedAt);
+  const partsUpdatedAtText = formatPartsTimestamp(formData.partsStatusUpdatedAt);
+
+  const partsStatusMeta = (() => {
+    const entries = [];
+    if (partsOrderedAtText) entries.push(`Ordered ${partsOrderedAtText}`);
+    if (partsReceivedAtText) entries.push(`Received ${partsReceivedAtText}`);
+    if (entries.length === 0 && partsStatus !== PARTS_STATUS.NONE && partsUpdatedAtText) {
+      entries.push(`Updated ${partsUpdatedAtText}`);
+    }
+    if (entries.length > 0 && formData.partsStatusUpdatedBy) {
+      entries.push(`by ${formData.partsStatusUpdatedBy}`);
+    }
+    return entries.join(' · ');
+  })();
+
   return (
     <div className="modal">
       <div className="modal-content">
@@ -761,6 +815,25 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
                   Time Needs Confirmation
                 </label>
               </div>
+            </div>
+
+            <div className={`parts-status-section parts-status-section--${partsStatus}`}>
+              <label className="parts-status-label">Parts:</label>
+              <div className="parts-status-options" role="group" aria-label="Parts status">
+                {PARTS_STATUS_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`parts-status-button parts-status-button--${option.value}${partsStatus === option.value ? ' is-active' : ''}`}
+                    onClick={() => handlePartsStatusChange(option.value)}
+                    disabled={userRole !== 'admin'}
+                    aria-pressed={partsStatus === option.value}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              {partsStatusMeta && <p className="parts-status-meta">{partsStatusMeta}</p>}
             </div>
           </div>
 

@@ -1,11 +1,13 @@
 import React, { forwardRef, useState, useEffect } from 'react';
 import './PrintableJobCard.css';
 import { getTechnicianName } from '../../utils/technicianUtils';
+import { PARTS_STATUS, getPartsStatus, getPartsStatusLabel } from '../../utils/partsStatus';
 
 const PrintableJobCard = forwardRef(({ appointment }, ref) => {
   const details = appointment?.details || {};
   const tasks = details.tasks || [];
   const comments = details.comments || ''; // Retrieve the comments
+  const partsStatus = getPartsStatus(details);
 
    // Split comments by new line characters
    const formattedComments = comments.split('\n');
@@ -43,6 +45,9 @@ const PrintableJobCard = forwardRef(({ appointment }, ref) => {
       <p><strong>Customer Phone:</strong> {details.customerPhone || 'N/A'}</p>
       <p><strong>Appointment Date:</strong> {appointment?.date || 'N/A'}</p>
       <p><strong>Mechanic:</strong> {technicianName}</p>
+      {partsStatus !== PARTS_STATUS.NONE && (
+        <p><strong>Parts:</strong> {getPartsStatusLabel(partsStatus)}</p>
+      )}
       
 
       <h3>Tasks</h3>

@@ -1,7 +1,16 @@
 // src/components/Calendar/Calendar.js
 import React from 'react';
 import './Calendar.css';
-import { FaEdit, FaFlag } from 'react-icons/fa';
+import { FaEdit, FaFlag, FaBox, FaBoxOpen, FaTruck } from 'react-icons/fa';
+import { PARTS_STATUS, getPartsStatus, getPartsStatusLabel } from '../../utils/partsStatus';
+
+// Parts state is shown as a badge so the block's background colour keeps meaning
+// job progress rather than doubling up as a parts indicator.
+const PARTS_BADGES = {
+  [PARTS_STATUS.NEEDED]: { icon: FaBoxOpen, className: 'appointment-parts-badge--needed' },
+  [PARTS_STATUS.ORDERED]: { icon: FaTruck, className: 'appointment-parts-badge--ordered' },
+  [PARTS_STATUS.RECEIVED]: { icon: FaBox, className: 'appointment-parts-badge--received' },
+};
 
 // Define time slots excluding lunch
 const timeSlots = [
@@ -153,6 +162,13 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
                 const flagTooltip = flaggedReason
                   ? `Flagged account: ${flaggedReason}`
                   : 'Flagged account';
+                const partsStatus = getPartsStatus(appointment?.details);
+                const partsBadge = PARTS_BADGES[partsStatus];
+                const PartsIcon = partsBadge?.icon;
+                const partsTooltip = partsBadge ? `Parts: ${getPartsStatusLabel(partsStatus)}` : '';
+                const blockTooltip = [isFlagged ? flagTooltip : '', partsTooltip]
+                  .filter(Boolean)
+                  .join(' · ') || undefined;
                 return (
                   <div
                     key={techIndex}
@@ -173,11 +189,19 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
                           ),
                           gridRow: `span ${calculateAppointmentSpan(appointment)}`,
                         }}
-                        title={isFlagged ? flagTooltip : undefined}
+                        title={blockTooltip}
                       >
                         {isFlagged && (
                           <span className="appointment-flag-badge" aria-label={flagTooltip}>
                             <FaFlag />
+                          </span>
+                        )}
+                        {partsBadge && (
+                          <span
+                            className={`appointment-parts-badge ${partsBadge.className}`}
+                            aria-label={partsTooltip}
+                          >
+                            <PartsIcon />
                           </span>
                         )}
                         {/* Time range in bold */}
