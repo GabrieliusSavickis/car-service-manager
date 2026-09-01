@@ -3,6 +3,12 @@ import React from 'react';
 import './Calendar.css';
 import { FaEdit, FaFlag, FaBox, FaBoxOpen, FaTruck } from 'react-icons/fa';
 import { PARTS_STATUS, getPartsStatus, getPartsStatusLabel } from '../../utils/partsStatus';
+import {
+  describeEntryWindow,
+  entryCoversTime,
+  getEntrySlotCount,
+  getEntryWindow,
+} from '../../utils/unavailability';
 
 // Parts state is shown as a badge so the block's background colour keeps meaning
 // job progress rather than doubling up as a parts indicator.
@@ -25,7 +31,7 @@ const timeSlots = [
   '17:00', '17:30',
 ];
 
-const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician, unavailableByTechId = {} }) => {
+const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician, unavailabilityByTechId = {} }) => {
 
   const getFlagReasonText = (reasonValue) => {
     if (!reasonValue) return '';
@@ -109,10 +115,11 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
     return `${start} – ${end}`;
   };
 
-  // Match full-day unavailable blocks to the same span logic as appointments (including lunch divider).
-  const fullDayUnavailableSpan = calculateAppointmentSpan({
-    startTime: timeSlots[0],
-    details: { expectedTime: timeSlots.length },
+  // Unavailable blocks use the same span logic as appointments so they line up
+  // with the grid, including the lunch break divider.
+  const getUnavailabilitySpan = (entry) => calculateAppointmentSpan({
+    startTime: getEntryWindow(entry).startTime,
+    details: { expectedTime: getEntrySlotCount(entry) },
   });
 
   return (
@@ -155,8 +162,14 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
                 const appointment = appointments.find(
                   (app) => app.startTime === time && (app.techId === tech.id || app.tech === tech.id || app.tech === tech.name)
                 );
-                const unavailableReason = unavailableByTechId[tech.id];
-                const isUnavailable = Boolean(unavailableReason);
+                const techUnavailability = unavailabilityByTechId[tech.id] || [];
+                // A slot is blocked by any entry covering it; the block itself is
+                // only drawn in the slot where that entry starts.
+                const coveringEntry = techUnavailability.find((entry) => entryCoversTime(entry, time));
+                const startingEntry = techUnavailability.find(
+                  (entry) => getEntryWindow(entry).startTime === time
+                );
+                const isUnavailable = Boolean(coveringEntry);
                 const isFlagged = appointment?.accountFlagged === true;
                 const flaggedReason = getFlagReasonText(appointment?.accountFlaggedReason);
                 const flagTooltip = flaggedReason
@@ -208,8 +221,13 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
                         <div className="appointment-time">
                           <strong>{getAppointmentTimeRange(appointment)}</strong>
                         </div>
-                        {/* Vehicle reg & tasks */}
-                        <div>{appointment.details.vehicleReg}</div>
+                        {/* Vehicle reg, make & tasks */}
+                        <div className="appointment-vehicle">
+                          {appointment.details.vehicleReg}
+                          {appointment.details.vehicleMake && (
+                            <span className="appointment-vehicle-make"> · {appointment.details.vehicleMake}</span>
+                          )}
+                        </div>
                         <div>
                           {getAppointmentTaskText(
                             appointment,
@@ -218,7 +236,7 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
                         </div>
                       </div>
                     )}
-                    {!appointment && isUnavailable && time === timeSlots[0] && (
+                    {!appointment && startingEntry && (
                       <div
                         className="appointment unavailable-appointment"
                         onClick={(e) => {
@@ -226,14 +244,15 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
                           onTimeSlotClick(time, tech.id);
                         }}
                         style={{
-                          height: getAppointmentHeight(fullDayUnavailableSpan),
-                          gridRow: `span ${fullDayUnavailableSpan}`,
+                          height: getAppointmentHeight(getUnavailabilitySpan(startingEntry)),
+                          gridRow: `span ${getUnavailabilitySpan(startingEntry)}`,
                         }}
+                        title={`${startingEntry.reason || 'Unavailable'} · ${describeEntryWindow(startingEntry)}`}
                       >
                         <div className="appointment-time">
-                          <strong>Unavailable</strong>
+                          <strong>{describeEntryWindow(startingEntry)}</strong>
                         </div>
-                        <div>{unavailableReason}</div>
+                        <div>{startingEntry.reason || 'Unavailable'}</div>
                       </div>
                     )}
                   </div>

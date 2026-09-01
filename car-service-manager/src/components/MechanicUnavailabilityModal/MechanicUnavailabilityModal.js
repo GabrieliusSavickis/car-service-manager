@@ -1,5 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './MechanicUnavailabilityModal.css';
+import {
+  UNAVAILABILITY_COVERAGE,
+  UNAVAILABILITY_COVERAGE_OPTIONS,
+  UNAVAILABILITY_REASONS,
+  UNAVAILABILITY_SLOT_END_TIMES,
+  UNAVAILABILITY_TIME_SLOTS,
+  describeEntryWindow,
+  getEntryWindow,
+  isCustomRangeValid,
+} from '../../utils/unavailability';
+
+const DEFAULT_REASON = UNAVAILABILITY_REASONS[0];
+const DEFAULT_CUSTOM_START = UNAVAILABILITY_TIME_SLOTS[0];
+const DEFAULT_CUSTOM_END = UNAVAILABILITY_SLOT_END_TIMES[UNAVAILABILITY_SLOT_END_TIMES.length - 1];
 
 const formatDateInputValue = (date) => {
   const year = date.getFullYear();
@@ -20,7 +34,10 @@ function MechanicUnavailabilityModal({ technicians, selectedDate, unavailability
   const [mechanic, setMechanic] = useState('');
   const [startDay, setStartDay] = useState(initialDateValue);
   const [endDay, setEndDay] = useState(initialDateValue);
-  const [reason, setReason] = useState('Holiday');
+  const [reason, setReason] = useState(DEFAULT_REASON);
+  const [coverage, setCoverage] = useState(UNAVAILABILITY_COVERAGE.FULL);
+  const [startTime, setStartTime] = useState(DEFAULT_CUSTOM_START);
+  const [endTime, setEndTime] = useState(DEFAULT_CUSTOM_END);
   const [editingId, setEditingId] = useState(null);
 
   useEffect(() => {
@@ -52,7 +69,10 @@ function MechanicUnavailabilityModal({ technicians, selectedDate, unavailability
 
   const resetForm = () => {
     setEditingId(null);
-    setReason('Holiday');
+    setReason(DEFAULT_REASON);
+    setCoverage(UNAVAILABILITY_COVERAGE.FULL);
+    setStartTime(DEFAULT_CUSTOM_START);
+    setEndTime(DEFAULT_CUSTOM_END);
     setStartDay(initialDateValue);
     setEndDay(initialDateValue);
     if (technicians.length > 0) {
@@ -67,7 +87,12 @@ function MechanicUnavailabilityModal({ technicians, selectedDate, unavailability
     setMechanic(entry.mechanic || technicians[0]?.id || '');
     setStartDay(start ? formatDateInputValue(start) : initialDateValue);
     setEndDay(end ? formatDateInputValue(end) : initialDateValue);
-    setReason(entry.reason || 'Holiday');
+    setReason(entry.reason || DEFAULT_REASON);
+
+    const window = getEntryWindow(entry);
+    setCoverage(window.coverage);
+    setStartTime(window.startTime);
+    setEndTime(window.endTime);
   };
 
   const handleDeleteEntry = async (entryId) => {
@@ -90,12 +115,22 @@ function MechanicUnavailabilityModal({ technicians, selectedDate, unavailability
       return;
     }
 
+    const isCustom = coverage === UNAVAILABILITY_COVERAGE.CUSTOM;
+
+    if (isCustom && !isCustomRangeValid(startTime, endTime)) {
+      alert('End time cannot be before start time.');
+      return;
+    }
+
     await onSave({
       id: editingId,
       mechanic,
       startDay: start,
       endDay: end,
       reason,
+      coverage,
+      startTime: isCustom ? startTime : '',
+      endTime: isCustom ? endTime : '',
     });
   };
 
@@ -126,10 +161,50 @@ function MechanicUnavailabilityModal({ technicians, selectedDate, unavailability
           </label>
 
           <label>
+            Hours
+            <select value={coverage} onChange={(e) => setCoverage(e.target.value)} required>
+              {UNAVAILABILITY_COVERAGE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {coverage === UNAVAILABILITY_COVERAGE.CUSTOM && (
+            <div className="unavailability-time-range">
+              <label>
+                From
+                <select value={startTime} onChange={(e) => setStartTime(e.target.value)} required>
+                  {UNAVAILABILITY_TIME_SLOTS.map((slot) => (
+                    <option key={slot} value={slot}>{slot}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                To
+                <select value={endTime} onChange={(e) => setEndTime(e.target.value)} required>
+                  {UNAVAILABILITY_SLOT_END_TIMES.map((slot) => (
+                    <option key={slot} value={slot}>{slot}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
+
+          {coverage !== UNAVAILABILITY_COVERAGE.FULL && (
+            <p className="unavailability-hours-hint">
+              These hours apply to every day in the range above.
+            </p>
+          )}
+
+          <label>
             Reason
             <select value={reason} onChange={(e) => setReason(e.target.value)} required>
-              <option value="Holiday">Holiday</option>
-              <option value="Sick Day">Sick Day</option>
+              {UNAVAILABILITY_REASONS.map((reasonOption) => (
+                <option key={reasonOption} value={reasonOption}>{reasonOption}</option>
+              ))}
             </select>
           </label>
 
@@ -154,7 +229,7 @@ function MechanicUnavailabilityModal({ technicians, selectedDate, unavailability
               <div key={entry.id} className="unavailability-item">
                 <div>
                   <strong>{mechanicNameById[entry.mechanic] || entry.mechanic}</strong>
-                  <div>{entry.reason || 'Unavailable'}</div>
+                  <div>{entry.reason || 'Unavailable'} &middot; {describeEntryWindow(entry)}</div>
                   <div>
                     {start ? formatDateInputValue(start) : 'Unknown'} to {end ? formatDateInputValue(end) : 'Unknown'}
                   </div>

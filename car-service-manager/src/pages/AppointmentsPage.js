@@ -8,6 +8,7 @@ import { collection, addDoc, doc, updateDoc, deleteDoc, query, where, setDoc, on
 import DatePicker from '../components/DatePicker/DatePicker';
 import './AppointmentsPage.css';
 import { getTechnicians, clearTechniciansCache } from '../utils/technicianUtils';
+import { describeEntryWindow, entryCoversTime } from '../utils/unavailability';
 
 function AppointmentsPage() {
   // Determine the domain
@@ -292,13 +293,13 @@ function AppointmentsPage() {
     return day === 0 || day === 6 || staticBankHolidays.includes(formattedDate) || dynamicBankHolidays.includes(date.toLocaleDateString('en-IE'));
   };
 
-  const getMechanicUnavailabilityForSelectedDay = (techId) => {
-    return unavailability.find((entry) => entry.mechanic === techId);
+  const getMechanicUnavailabilityForSlot = (techId, time) => {
+    return unavailability.find((entry) => entry.mechanic === techId && entryCoversTime(entry, time));
   };
 
-  const unavailableByTechId = unavailability.reduce((acc, entry) => {
+  const unavailabilityByTechId = unavailability.reduce((acc, entry) => {
     if (entry.mechanic) {
-      acc[entry.mechanic] = entry.reason || 'Unavailable';
+      acc[entry.mechanic] = [...(acc[entry.mechanic] || []), entry];
     }
     return acc;
   }, {});
@@ -311,11 +312,12 @@ function AppointmentsPage() {
       return;
     }
 
-    const mechanicUnavailability = getMechanicUnavailabilityForSelectedDay(techId);
+    const mechanicUnavailability = getMechanicUnavailabilityForSlot(techId, time);
     if (mechanicUnavailability) {
       const mechanicName = technicians.find((t) => t.id === techId)?.name || 'This mechanic';
       const reason = mechanicUnavailability.reason || 'Unavailable';
-      setWarningMessage(`${mechanicName} is marked unavailable (${reason}) on this date.`);
+      const window = describeEntryWindow(mechanicUnavailability);
+      setWarningMessage(`${mechanicName} is marked unavailable (${reason} - ${window}) on this date.`);
       return;
     }
 
@@ -799,7 +801,7 @@ function AppointmentsPage() {
     setSelectedDate(new Date()); // Set the date to today's date
   };
 
-  const handleSaveUnavailability = async ({ id, mechanic, startDay, endDay, reason }) => {
+  const handleSaveUnavailability = async ({ id, mechanic, startDay, endDay, reason, coverage, startTime, endTime }) => {
     if (userRole !== 'admin') {
       alert('Only admins can mark mechanic unavailability.');
       return;
@@ -816,6 +818,9 @@ function AppointmentsPage() {
       startDay: Timestamp.fromDate(normalizedStart),
       endDay: Timestamp.fromDate(normalizedEnd),
       reason,
+      coverage: coverage || 'full',
+      startTime: startTime || '',
+      endTime: endTime || '',
     };
 
     if (id) {
@@ -880,7 +885,7 @@ function AppointmentsPage() {
         onTimeSlotClick={handleTimeSlotClick}
         technicians={technicians}
         onEditTechnician={handleEditTechnician}
-        unavailableByTechId={unavailableByTechId}
+        unavailabilityByTechId={unavailabilityByTechId}
       />
       {isModalOpen && (
         <AppointmentModal

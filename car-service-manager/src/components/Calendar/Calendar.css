@@ -145,6 +145,14 @@
   color: #1b7f36;
 }
 
+.appointment-vehicle {
+  text-align: center;
+}
+
+.appointment-vehicle-make {
+  opacity: 0.85;
+}
+
 /* New styles for lunch break */
 .lunch-break-divider {
   grid-column: 1 / span 5; /* Span across the entire grid */
