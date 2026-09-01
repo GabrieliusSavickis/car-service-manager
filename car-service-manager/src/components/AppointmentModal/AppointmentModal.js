@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './AppointmentModal.css';
-import { FaCircle, FaCheckCircle, FaPrint, FaExchangeAlt, FaPencilAlt, FaTrash, FaCheck, FaTimes, FaLock } from 'react-icons/fa';
+import { FaCircle, FaCheckCircle, FaPrint, FaExchangeAlt, FaPencilAlt, FaTrash, FaCheck, FaTimes, FaLock, FaInfoCircle } from 'react-icons/fa';
 import { firestore } from '../../firebase';
-import { collection, query, where, getDocs, updateDoc, doc, getDoc, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, setDoc, doc, getDoc, limit } from 'firebase/firestore';
 import PrintableJobCard from '../PrintableJobCard/PrintableJobCard';
 import ReactToPrint from 'react-to-print';
 import { getTechnicians } from '../../utils/technicianUtils';
@@ -122,6 +122,11 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   const [newTime, setNewTime] = useState('');
   const [initialComments, setInitialComments] = useState('');
   const [showPrivateNote, setShowPrivateNote] = useState(false);
+  // Customer notes live on the account, not the appointment, so they persist
+  // across every booking for this vehicle reg.
+  const [customerNotes, setCustomerNotes] = useState('');
+  const [initialCustomerNotes, setInitialCustomerNotes] = useState('');
+  const [showCustomerNotes, setShowCustomerNotes] = useState(false);
   const [vehicleRegLookupStatus, setVehicleRegLookupStatus] = useState('');
   const [isFlaggedAccount, setIsFlaggedAccount] = useState(false);
   const [flaggedReason, setFlaggedReason] = useState('');
@@ -165,6 +170,19 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     };
   }, [accountsCollectionName]);
 
+  // Mirror an account's flag + notes into the modal. Customer notes are opened
+  // automatically when the account has any, so they are never skipped over.
+  const applyAccountToForm = useCallback((accountData) => {
+    const isFlagged = accountData?.flagged === true;
+    setIsFlaggedAccount(isFlagged);
+    setFlaggedReason(isFlagged ? getFlagReasonText(accountData.flaggedReason) : '');
+
+    const notes = accountData?.customerNotes || '';
+    setCustomerNotes(notes);
+    setInitialCustomerNotes(notes);
+    setShowCustomerNotes(Boolean(notes));
+  }, []);
+
   useEffect(() => {
     const role = sessionStorage.getItem('userRole');
     const storedUsername = sessionStorage.getItem('username');
@@ -196,28 +214,27 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       console.log('Loaded appointment details with converted dates:', convertedDetails);
       setInitialComments(appointment.details.comments || '');
 
+      // Open the private note straight away when there is something to read, so a
+      // note left for the next receptionist cannot be missed behind a closed panel.
+      setShowPrivateNote(Boolean(convertedDetails.privateNote));
+
       // Check if the account is flagged when opening an existing appointment
       const vehicleReg = convertedDetails.vehicleReg;
       if (vehicleReg) {
         loadAccountByVehicleReg(vehicleReg).then((accountResult) => {
-          if (accountResult) {
-            const accountData = accountResult.data;
-            setIsFlaggedAccount(accountData.flagged === true);
-            setFlaggedReason(accountData.flagged === true ? getFlagReasonText(accountData.flaggedReason) : '');
-          } else {
-            setIsFlaggedAccount(false);
-            setFlaggedReason('');
-          }
+          applyAccountToForm(accountResult?.data || null);
         });
+      } else {
+        applyAccountToForm(null);
       }
     } else {
       // New appointment
       setFormData({ ...initialFormData });
       setInitialComments('');
-      setIsFlaggedAccount(false);
-      setFlaggedReason('');
+      setShowPrivateNote(false);
+      applyAccountToForm(null);
     }
-  }, [appointment, loadAccountByVehicleReg]);
+  }, [appointment, loadAccountByVehicleReg, applyAccountToForm]);
 
   // Load technicians from Firestore
   useEffect(() => {
@@ -518,19 +535,27 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       onSave(appointmentToSave);
     }
 
-    // Save updated mileage to the vehicle's account
-    if (formData.vehicleReg && formData.mileage) {
-      const accountResult = await loadAccountByVehicleReg(formData.vehicleReg);
-      if (accountResult?.ref) {
-        await updateDoc(accountResult.ref, { mileage: formData.mileage });
-      }
-      // Optionally, create a new account if it doesn't exist
-      // await addDoc(accountsCollection, {
-      //   vehicleReg: formData.vehicleReg,
-      //   mileage: formData.mileage,
-      //   // Add other fields as needed
-      // });
+    // Save updated mileage and customer notes to the vehicle's account. Notes are
+    // only written when they actually changed, so an account lookup that has not
+    // resolved yet can never blank out an existing note.
+    const normalizedReg = formData.vehicleReg.trim().toUpperCase().replace(/\s+/g, '');
+    if (normalizedReg) {
+      const accountUpdates = {};
 
+      if (formData.mileage) {
+        accountUpdates.mileage = formData.mileage;
+      }
+      if (customerNotes !== initialCustomerNotes) {
+        accountUpdates.customerNotes = customerNotes.trim();
+      }
+
+      if (Object.keys(accountUpdates).length > 0) {
+        const accountResult = await loadAccountByVehicleReg(normalizedReg);
+        // Fall back to the reg as the doc id so a brand new customer's details
+        // are still recorded rather than silently dropped.
+        const accountRef = accountResult?.ref || doc(firestore, accountsCollectionName, normalizedReg);
+        await setDoc(accountRef, accountUpdates, { merge: true });
+      }
     }
   };
 
@@ -618,8 +643,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
             customerPhone: accountData.customerPhone || '',
             mileage: accountData.mileage || '', // Populate mileage
           }));
-          setIsFlaggedAccount(accountData.flagged === true);
-          setFlaggedReason(accountData.flagged === true ? getFlagReasonText(accountData.flaggedReason) : '');
+          applyAccountToForm(accountData);
           setVehicleRegLookupStatus('Vehicle details loaded.');
         } else {
           // If no match is found, clear the account detail fields
@@ -630,8 +654,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
             customerPhone: '',
             mileage: '', // Clear mileage
           }));
-          setIsFlaggedAccount(false);
-          setFlaggedReason('');
+          applyAccountToForm(null);
           setVehicleRegLookupStatus('No matching vehicle found.');
         }
       }
@@ -665,6 +688,8 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     handleModalOpen();
   }, []);
 
+  const hasCustomerNotes = customerNotes.trim() !== '';
+  const hasPrivateNote = (formData.privateNote || '').trim() !== '';
   const partsStatus = getPartsStatus(formData);
   const partsOrderedAtText = formatPartsTimestamp(formData.partsOrderedAt);
   const partsReceivedAtText = formatPartsTimestamp(formData.partsReceivedAt);
@@ -787,6 +812,35 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
               />
             </label>
 
+            <div className={`customer-notes-section${hasCustomerNotes ? ' customer-notes-section--filled' : ''}`}>
+              <button
+                type="button"
+                className="customer-notes-toggle"
+                onClick={() => setShowCustomerNotes((prev) => !prev)}
+              >
+                <FaInfoCircle />
+                Customer Notes
+                {hasCustomerNotes && !showCustomerNotes && (
+                  <span className="customer-notes-dot" title="This account has notes" />
+                )}
+                <span className="customer-notes-chevron">{showCustomerNotes ? '▲' : '▼'}</span>
+              </button>
+              {showCustomerNotes && (
+                <>
+                  <textarea
+                    className="customer-notes-textarea"
+                    value={customerNotes}
+                    onChange={(e) => setCustomerNotes(e.target.value)}
+                    readOnly={userRole !== 'admin'}
+                    placeholder="Extra contact or collection details, e.g. partner collects the car, company contacts..."
+                  />
+                  <p className="customer-notes-hint">
+                    Saved to the account for {formData.vehicleReg || 'this vehicle'} and shown on every future booking.
+                  </p>
+                </>
+              )}
+            </div>
+
             {/* Updated Expected Time and Needs Validation */}
             <div className="time-validation-section">
               <label className="expected-time-label">
@@ -904,7 +958,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
             </div>
 
             {userRole === 'admin' && (
-              <div className="private-note-section">
+              <div className={`private-note-section${hasPrivateNote ? ' private-note-section--filled' : ''}`}>
                 <button
                   type="button"
                   className="private-note-toggle"
@@ -912,6 +966,9 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
                 >
                   <FaLock />
                   Private Note
+                  {hasPrivateNote && !showPrivateNote && (
+                    <span className="private-note-dot" title="This appointment has a private note" />
+                  )}
                   <span className="private-note-chevron">{showPrivateNote ? '▲' : '▼'}</span>
                 </button>
                 {showPrivateNote && (

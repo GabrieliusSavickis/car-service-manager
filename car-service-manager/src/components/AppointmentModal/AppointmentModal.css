@@ -489,3 +489,83 @@ form button:hover {
   font-size: 12px;
   color: #6b6b6b;
 }
+
+/* Customer notes (stored on the account) */
+.customer-notes-section {
+  margin-top: 10px;
+}
+
+.customer-notes-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background-color: transparent;
+  border: 1.5px solid #2297c2;
+  border-radius: 50px;
+  color: #2297c2;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.customer-notes-toggle:hover {
+  background-color: #2297c2;
+  color: white;
+}
+
+.customer-notes-section--filled .customer-notes-toggle {
+  background-color: #eaf6fb;
+}
+
+.customer-notes-section--filled .customer-notes-toggle:hover {
+  background-color: #2297c2;
+}
+
+.customer-notes-chevron {
+  font-size: 0.65rem;
+  margin-left: 2px;
+}
+
+.customer-notes-dot,
+.private-note-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #e67e22;
+  flex-shrink: 0;
+}
+
+.customer-notes-textarea {
+  margin-top: 8px;
+  width: 90%;
+  height: 80px;
+  padding: 8px;
+  border: 1.5px solid #2297c2;
+  border-radius: 4px;
+  background-color: #f5fbfd;
+  resize: vertical;
+  font-size: 0.875rem;
+  font-family: inherit;
+  display: block;
+}
+
+.customer-notes-textarea:read-only {
+  background-color: #f2f2f2;
+  color: #555;
+}
+
+.customer-notes-hint {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: #6b6b6b;
+}
+
+.private-note-section--filled .private-note-toggle {
+  background-color: #f7edfa;
+}
+
+.private-note-section--filled .private-note-toggle:hover {
+  background-color: #9b59b6;
+}

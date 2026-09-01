@@ -288,6 +288,7 @@ const AccountsPage = () => {
       customerName: account.customerName || '',
       customerPhone: account.customerPhone || '',
       vehicleMake: account.vehicleMake || '',
+      customerNotes: account.customerNotes || '',
       flagged: account.flagged || false,
       flaggedReason: account.flaggedReason || '',
     });
@@ -317,6 +318,7 @@ const AccountsPage = () => {
         customerName: editFields.customerName,
         customerPhone: editFields.customerPhone,
         vehicleMake: editFields.vehicleMake,
+        customerNotes: (editFields.customerNotes || '').trim(),
         flagged: editFields.flagged,
         flaggedReason: editFields.flagged ? editFields.flaggedReason || '' : '',
       });
@@ -521,6 +523,23 @@ const AccountsPage = () => {
                 onChange={handleEditFieldChange}
                 variant="outlined"
                 size="small"
+              />
+            </Box>
+            <Box sx={{ mb: 2 }}>
+              <Typography className="accounts-filter-label" sx={{ mb: 0.5 }}>
+                Customer Notes
+              </Typography>
+              <TextField
+                fullWidth
+                multiline
+                minRows={3}
+                name="customerNotes"
+                value={editFields.customerNotes || ''}
+                onChange={handleEditFieldChange}
+                variant="outlined"
+                size="small"
+                placeholder="Extra contact or collection details, e.g. partner collects the car, company contacts..."
+                helperText="Opens automatically in the appointment modal whenever this reg is booked"
               />
             </Box>
             <Divider sx={{ my: 2 }} />
