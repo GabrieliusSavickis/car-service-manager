@@ -67,6 +67,7 @@ function Header() {
         <Link to="/appointments" className="nav-link">Appointments</Link>
         <Link to="/accounts" className="nav-link">Accounts</Link>
         <Link to="/analytics" className="nav-link">Analytics</Link>
+        <Link to="/stock" className="nav-link">Stock</Link>
       </nav>
       <div className="header-right">
         {username && <span className="username-display">Logged in as <span className="username">{username}</span></span>}

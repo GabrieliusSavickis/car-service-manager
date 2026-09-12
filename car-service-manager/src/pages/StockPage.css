@@ -1,0 +1,423 @@
+/* Stock Page Shell - matches the Accounts page look */
+.stock-page-shell {
+  min-height: 100vh;
+  background: #f4f7fc;
+}
+
+.stock-page {
+  min-height: 60vh;
+  padding: 20px 0 40px;
+}
+
+.stock-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.stock-page-title {
+  font-weight: 700 !important;
+  color: #1a202c !important;
+}
+
+.stock-page-subtitle {
+  color: #667089 !important;
+  margin-top: 2px !important;
+}
+
+/* Tabs */
+.stock-tabs {
+  min-height: 44px !important;
+  background: #ffffff;
+  border: 1px solid #e5eaf3;
+  border-radius: 12px;
+  padding: 4px;
+}
+
+.stock-tabs .MuiTabs-flexContainer {
+  gap: 4px;
+}
+
+.stock-tabs-indicator {
+  display: none;
+}
+
+.stock-tab {
+  min-height: 36px !important;
+  padding: 6px 16px !important;
+  border-radius: 8px !important;
+  text-transform: none !important;
+  font-weight: 600 !important;
+  color: #5d6780 !important;
+  gap: 8px;
+}
+
+.stock-tab.Mui-selected {
+  background: #c23b22;
+  color: #ffffff !important;
+}
+
+/* Summary tiles */
+.stock-summary-grid {
+  margin-bottom: 8px !important;
+}
+
+.stock-summary-item {
+  border: 1px solid #e6ebf4;
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: #ffffff;
+}
+
+.stock-summary-item--alert {
+  border-color: #f5c6c0;
+  background: #fff5f4;
+}
+
+.stock-summary-label {
+  color: #667089 !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.4px !important;
+}
+
+.stock-summary-value {
+  margin-top: 6px !important;
+  color: #111827 !important;
+  font-size: 22px !important;
+  font-weight: 700 !important;
+}
+
+.stock-summary-item--alert .stock-summary-value {
+  color: #c23b22 !important;
+}
+
+/* Surface card */
+.stock-surface-card {
+  background: #ffffff !important;
+  border-radius: 20px !important;
+  border: 1px solid #e5eaf3 !important;
+  box-shadow: 0 10px 30px rgba(22, 34, 51, 0.06) !important;
+}
+
+.stock-surface-card .MuiCardContent-root {
+  padding: 20px !important;
+}
+
+.stock-table-card {
+  margin-top: 16px;
+}
+
+.stock-table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.stock-section-title {
+  font-weight: 700 !important;
+  color: #1a202c !important;
+}
+
+.stock-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.stock-search-field {
+  min-width: 240px;
+}
+
+.stock-location-filter {
+  min-width: 150px;
+}
+
+.stock-toolbar .MuiOutlinedInput-root {
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.stock-toolbar .MuiOutlinedInput-notchedOutline {
+  border-color: #d8dfeb !important;
+}
+
+.stock-action-message {
+  color: #5d6780 !important;
+  margin-bottom: 12px !important;
+}
+
+/* Buttons */
+.stock-primary-btn {
+  background-color: #c23b22 !important;
+  color: white !important;
+  text-transform: none !important;
+  font-weight: 600 !important;
+  padding: 6px 16px !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  transition: background-color 0.3s ease !important;
+}
+
+.stock-primary-btn:hover {
+  background-color: #a32e1c !important;
+}
+
+.stock-btn-icon {
+  margin-right: 8px;
+  font-size: 12px;
+}
+
+.stock-secondary-btn {
+  border-color: #c4cfe0 !important;
+  color: #344054 !important;
+  text-transform: none !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+}
+
+.stock-secondary-btn:hover {
+  border-color: #9fb1cb !important;
+  background: #f5f8fc !important;
+}
+
+.stock-delete-btn {
+  color: #8a9ab5 !important;
+  text-transform: none !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+}
+
+.stock-delete-btn:hover {
+  color: #c23b22 !important;
+  background: #fff1ef !important;
+}
+
+.stock-filter-btn {
+  min-width: auto !important;
+  padding: 6px 12px !important;
+  border-radius: 999px !important;
+  color: #8a9ab5 !important;
+  text-transform: none !important;
+  font-weight: 600 !important;
+  gap: 6px;
+}
+
+.stock-filter-btn:hover {
+  background: #f3f6fb !important;
+  color: #5d6780 !important;
+}
+
+.stock-filter-btn--active {
+  background: #fff1ef !important;
+  color: #c23b22 !important;
+}
+
+.stock-filter-btn--active:hover {
+  background: #ffe8e3 !important;
+}
+
+/* Table */
+.stock-table-container {
+  max-height: 600px;
+  overflow: auto;
+  border: 1px solid #e8edf6;
+  border-radius: 14px;
+}
+
+.stock-table-container table {
+  width: 100%;
+}
+
+.stock-table-header-row th {
+  font-weight: 700;
+  color: #344054;
+  background-color: #f8fafb !important;
+  border-bottom: 1px solid #e8edf6 !important;
+  padding: 12px !important;
+  white-space: nowrap;
+}
+
+.stock-table-row td {
+  padding: 10px 12px !important;
+  border-bottom: 1px solid #e8edf6 !important;
+  color: #5d6780;
+}
+
+.stock-table-row:hover {
+  background-color: #f9fbff !important;
+}
+
+.stock-table-row--low {
+  background-color: #fffaf3 !important;
+}
+
+.stock-table-row--out {
+  background-color: #fff5f4 !important;
+}
+
+.stock-table-row--out .stock-item-name {
+  color: #9aa3b5;
+}
+
+.stock-item-name {
+  color: #1a202c !important;
+  font-weight: 600;
+}
+
+.stock-notes-cell {
+  max-width: 220px;
+  white-space: pre-wrap;
+  font-size: 13px;
+}
+
+.stock-empty-cell {
+  text-align: center !important;
+  color: #8a9ab5 !important;
+  padding: 32px 12px !important;
+}
+
+.stock-row-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+/* Quantity control */
+.stock-qty-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stock-qty-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid #c4cfe0;
+  background: #ffffff;
+  color: #344054;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.stock-qty-btn:hover:not(:disabled) {
+  background: #f5f8fc;
+  border-color: #9fb1cb;
+}
+
+.stock-qty-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.stock-qty-value {
+  min-width: 32px;
+  text-align: center;
+  font-weight: 700;
+  color: #1a202c;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status chips */
+.stock-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.stock-status-chip--ok {
+  background: #e8f6ec;
+  color: #1b6b2f;
+}
+
+.stock-status-chip--low {
+  background: #fff4e0;
+  color: #8a5300;
+}
+
+.stock-status-chip--out {
+  background: #fdecea;
+  color: #b71c1c;
+}
+
+/* Location chips */
+.stock-location-chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  background: #eef2f8;
+  color: #344054;
+  white-space: nowrap;
+}
+
+.stock-location-chip--here {
+  background: #fff1ef;
+  color: #c23b22;
+}
+
+/* Dialog */
+.stock-modal .MuiDialog-paper {
+  border-radius: 20px !important;
+  box-shadow: 0 10px 30px rgba(22, 34, 51, 0.06) !important;
+}
+
+.stock-modal-title {
+  font-weight: 700 !important;
+  color: #1a202c !important;
+  padding: 20px !important;
+  border-bottom: 1px solid #e5eaf3 !important;
+}
+
+.stock-modal-content {
+  padding: 20px !important;
+}
+
+.stock-modal-actions {
+  padding: 14px 20px !important;
+}
+
+.stock-field-label {
+  margin-bottom: 6px !important;
+  color: #5d6780 !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+.stock-form-error {
+  color: #c23b22 !important;
+  font-weight: 600 !important;
+}
+
+@media (max-width: 768px) {
+  .stock-page-header {
+    align-items: stretch;
+  }
+
+  .stock-search-field,
+  .stock-location-filter {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+}

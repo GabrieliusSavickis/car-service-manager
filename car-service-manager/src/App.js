@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage';
 import AppointmentsPage from './pages/AppointmentsPage';
 import AccountsPage from './pages/AccountsPage';
 import Analytics from './pages/Analytics';
+import StockPage from './pages/StockPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { auth } from './firebase';
 
@@ -40,6 +41,7 @@ function App() {
         <Route path="/appointments" element={<ProtectedRoute component={AppointmentsPage} />} />
         <Route path="/accounts" element={<ProtectedRoute component={AccountsPage} />} />
         <Route path="/analytics" element={<ProtectedRoute component={Analytics} />} />
+        <Route path="/stock" element={<ProtectedRoute component={StockPage} />} />
       </Routes>
     </Router>
   );
