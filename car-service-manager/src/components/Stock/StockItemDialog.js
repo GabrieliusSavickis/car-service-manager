@@ -27,6 +27,7 @@ const buildInitialValues = (variant, item, defaultLocation) => ({
   supplier: item?.supplier || '',
   vehicleMake: item?.vehicleMake || '',
   vehicleModel: item?.vehicleModel || '',
+  costPrice: isBlank(item?.costPrice) ? '' : String(item.costPrice),
   price: isBlank(item?.price) ? '' : String(item.price),
   quantity: isBlank(item?.quantity)
     ? (variant === STOCK_ITEM_VARIANTS.SHARED ? '1' : '0')
@@ -53,9 +54,17 @@ const validate = (variant, values) => {
   }
 
   if (values.price.trim() === '') {
-    if (!isShared) errors.price = 'Price is required';
+    if (!isShared) errors.price = 'Sell price is required';
   } else if (!Number.isFinite(Number(values.price)) || Number(values.price) < 0) {
     errors.price = 'Enter a price of 0 or more';
+  }
+
+  if (!isShared) {
+    if (values.costPrice.trim() === '') {
+      errors.costPrice = 'Cost is required';
+    } else if (!Number.isFinite(Number(values.costPrice)) || Number(values.costPrice) < 0) {
+      errors.costPrice = 'Enter a cost of 0 or more';
+    }
   }
 
   if (!isWholeNumber(values.quantity)) {
@@ -85,6 +94,7 @@ const toPayload = (variant, values) => {
     return {
       ...base,
       supplier: values.supplier.trim(),
+      costPrice: toNumber(values.costPrice),
       lowStockThreshold: toNumber(values.lowStockThreshold),
     };
   }
@@ -237,8 +247,25 @@ function StockItemDialog({ open, variant, item, defaultLocation, onSave, onClose
               </Grid>
             )}
 
-            <Grid item xs={12} sm={isShared ? 6 : 4}>
-              <Typography className="stock-field-label">Price (EUR)</Typography>
+            {!isShared && (
+              <Grid item xs={12} sm={6}>
+                <Typography className="stock-field-label">Cost (EUR)</Typography>
+                <TextField
+                  fullWidth
+                  name="costPrice"
+                  value={values.costPrice}
+                  onChange={handleChange}
+                  size="small"
+                  inputProps={{ inputMode: 'decimal' }}
+                  placeholder="0.00"
+                  error={Boolean(errors.costPrice)}
+                  helperText={errors.costPrice}
+                />
+              </Grid>
+            )}
+
+            <Grid item xs={12} sm={6}>
+              <Typography className="stock-field-label">{isShared ? 'Price (EUR)' : 'Sell Price (EUR)'}</Typography>
               <TextField
                 fullWidth
                 name="price"
@@ -252,7 +279,7 @@ function StockItemDialog({ open, variant, item, defaultLocation, onSave, onClose
               />
             </Grid>
 
-            <Grid item xs={12} sm={isShared ? 6 : 4}>
+            <Grid item xs={12} sm={6}>
               <Typography className="stock-field-label">Quantity</Typography>
               <TextField
                 fullWidth
@@ -267,7 +294,7 @@ function StockItemDialog({ open, variant, item, defaultLocation, onSave, onClose
             </Grid>
 
             {!isShared && (
-              <Grid item xs={12} sm={4}>
+              <Grid item xs={12} sm={6}>
                 <Typography className="stock-field-label">Low Stock Alert At</Typography>
                 <TextField
                   fullWidth

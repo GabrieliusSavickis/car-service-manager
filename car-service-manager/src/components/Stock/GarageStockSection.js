@@ -74,7 +74,7 @@ function GarageStockSection({ collectionName, locationLabel }) {
     return items.reduce(
       (acc, item) => {
         acc.count += 1;
-        acc.value += toNumber(item.quantity) * toNumber(item.price);
+        acc.value += toNumber(item.quantity) * toNumber(item.costPrice);
         if (isLowStock(item)) acc.lowCount += 1;
         return acc;
       },
@@ -153,7 +153,7 @@ function GarageStockSection({ collectionName, locationLabel }) {
         </Grid>
         <Grid item xs={12} sm={4}>
           <Box className="stock-summary-item">
-            <Typography className="stock-summary-label">Stock Value</Typography>
+            <Typography className="stock-summary-label">Stock Value (at cost)</Typography>
             <Typography className="stock-summary-value">{formatCurrency(summary.value)}</Typography>
           </Box>
         </Grid>
@@ -202,7 +202,8 @@ function GarageStockSection({ collectionName, locationLabel }) {
                   <TableCell>Item</TableCell>
                   <TableCell>Part No.</TableCell>
                   <TableCell>Supplier</TableCell>
-                  <TableCell align="right">Price</TableCell>
+                  <TableCell align="right">Cost</TableCell>
+                  <TableCell align="right">Sell Price</TableCell>
                   <TableCell align="center">Quantity</TableCell>
                   <TableCell align="center">Alert At</TableCell>
                   <TableCell>Status</TableCell>
@@ -212,12 +213,12 @@ function GarageStockSection({ collectionName, locationLabel }) {
               <TableBody>
                 {loading && (
                   <TableRow>
-                    <TableCell colSpan={8} className="stock-empty-cell">Loading stock...</TableCell>
+                    <TableCell colSpan={9} className="stock-empty-cell">Loading stock...</TableCell>
                   </TableRow>
                 )}
                 {!loading && visibleItems.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} className="stock-empty-cell">
+                    <TableCell colSpan={9} className="stock-empty-cell">
                       {items.length === 0
                         ? 'No stock recorded yet. Add your first item to get started.'
                         : 'Nothing matches the current search or filter.'}
@@ -233,6 +234,7 @@ function GarageStockSection({ collectionName, locationLabel }) {
                       <TableCell className="stock-item-name">{item.name}</TableCell>
                       <TableCell>{item.partNumber || '-'}</TableCell>
                       <TableCell>{item.supplier || '-'}</TableCell>
+                      <TableCell align="right">{formatCurrency(item.costPrice)}</TableCell>
                       <TableCell align="right">{formatCurrency(item.price)}</TableCell>
                       <TableCell align="center">
                         <QuantityControl
