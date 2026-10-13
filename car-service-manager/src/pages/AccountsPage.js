@@ -1,6 +1,16 @@
 import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { firestore } from '../firebase';
 import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
+import MoveAppointmentsDialog from '../components/Accounts/MoveAppointmentsDialog';
+import {
+  deleteAccount,
+  getAppointmentsForReg,
+  normalizeVehicleReg,
+  renameAccountReg,
+} from '../utils/accountMaintenance';
+import { exportAccountsWorkbook } from '../utils/accountsExport';
+import { dedupeAppointmentSegments } from '../utils/serviceHistory';
+import { getLocationKey } from '../utils/location';
 import Header from '../components/Header/Header';
 import './AccountsPage.css';
 import { useNavigate } from 'react-router-dom';
@@ -83,41 +93,6 @@ const AccountTableRow = memo(({ account, onViewHistory, onEdit }) => (
   </TableRow>
 ));
 
-// Collapse the segments of a multi-day job into one history entry. Appointments
-// saved before group ids existed have none, so they key on their own doc id and
-// can never be merged with anything else. Nothing is written or deleted here -
-// this only decides what the history list shows.
-const dedupeAppointmentSegments = (appointments) => {
-  const byGroup = new Map();
-
-  appointments.forEach((appointment) => {
-    const key = appointment.appointmentGroupId || appointment.id;
-    const existing = byGroup.get(key);
-
-    if (!existing) {
-      byGroup.set(key, { ...appointment, segmentCount: 1 });
-      return;
-    }
-
-    const segmentCount = existing.segmentCount + 1;
-
-    // Show the first day of a split job: the anchor doc, else the earliest segment.
-    const existingIsAnchor = existing.id === existing.appointmentGroupId;
-    const candidateIsAnchor = appointment.id === appointment.appointmentGroupId;
-
-    let kept = existing;
-    if (candidateIsAnchor && !existingIsAnchor) {
-      kept = appointment;
-    } else if (!candidateIsAnchor && !existingIsAnchor && appointment.sortTime < existing.sortTime) {
-      kept = appointment;
-    }
-
-    byGroup.set(key, { ...kept, segmentCount });
-  });
-
-  return [...byGroup.values()];
-};
-
 const formatMileage = (mileage) => {
   const raw = (mileage ?? '').toString().trim();
   if (!raw) return 'Not recorded';
@@ -125,7 +100,7 @@ const formatMileage = (mileage) => {
 };
 
 // Memoized Appointment Entry Component
-const AppointmentEntry = memo(({ appointment, onToggle }) => (
+const AppointmentEntry = memo(({ appointment, onToggle, onMove }) => (
   <Box className="accounts-appointment-entry">
     <Box
       className="accounts-appointment-summary"
@@ -179,6 +154,16 @@ const AppointmentEntry = memo(({ appointment, onToggle }) => (
         <Typography variant="body2" sx={{ mt: 2 }}>
           <strong>Comments:</strong> {appointment.details.comments || 'No comments available'}
         </Typography>
+        <Box sx={{ mt: 2 }}>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => onMove(appointment)}
+            className="accounts-edit-btn"
+          >
+            Move to another reg
+          </Button>
+        </Box>
       </Box>
     </Collapse>
   </Box>
@@ -209,6 +194,12 @@ const AccountsPage = () => {
   const [editingAccount, setEditingAccount] = useState(null); // Account being edited
   const [editFields, setEditFields] = useState({}); // Edit form values
   const [editSaving, setEditSaving] = useState(false);
+  const [moveDialogOpen, setMoveDialogOpen] = useState(false);
+  const [appointmentsToMove, setAppointmentsToMove] = useState([]);
+  const [allAppointmentsForReg, setAllAppointmentsForReg] = useState([]);
+  const [maintenanceMessage, setMaintenanceMessage] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const navigate = useNavigate();
 
   // Memoize filtered accounts to prevent recalculation on every render
@@ -254,16 +245,16 @@ const AccountsPage = () => {
     }
   }, [navigate]);
 
-  useEffect(() => {
-    const fetchAccounts = async () => {
-      const accountsCollection = collection(firestore, accountsCollectionName);
-      const accountsSnapshot = await getDocs(accountsCollection);
-      const accountsList = accountsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setAccounts(accountsList);
-    };
+  const loadAccounts = useCallback(async () => {
+    const accountsCollection = collection(firestore, accountsCollectionName);
+    const accountsSnapshot = await getDocs(accountsCollection);
+    const accountsList = accountsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    setAccounts(accountsList);
+  }, [accountsCollectionName]);
 
-    fetchAccounts();
-  }, [accountsCollectionName]); // Add accountsCollectionName as a dependency
+  useEffect(() => {
+    loadAccounts();
+  }, [loadAccounts]);
 
   // Use useCallback to memoize handlers
   const handleSearchChange = useCallback((e) => {
@@ -327,7 +318,69 @@ const AccountsPage = () => {
 
     setSelectedAccount(vehicleReg);
     setServiceHistory(history);
+    setAllAppointmentsForReg(appointmentsList);
+    setMaintenanceMessage('');
   }, [locationSuffix]);
+
+  const handleMoveOne = useCallback((appointment) => {
+    setAppointmentsToMove([appointment]);
+    setMoveDialogOpen(true);
+  }, []);
+
+  const handleMoveAll = useCallback(() => {
+    setAppointmentsToMove(allAppointmentsForReg);
+    setMoveDialogOpen(true);
+  }, [allAppointmentsForReg]);
+
+  const handleMoved = useCallback(async (movedCount, targetAccount) => {
+    setMoveDialogOpen(false);
+    setAppointmentsToMove([]);
+
+    const targetReg = targetAccount.vehicleReg || targetAccount.id;
+    const label = movedCount === 1 ? '1 appointment' : `${movedCount} appointments`;
+
+    // Reload this account's history so what is left is accurate.
+    await handleViewServiceHistory(selectedAccount);
+    setMaintenanceMessage(`Moved ${label} to ${targetReg}.`);
+  }, [handleViewServiceHistory, selectedAccount]);
+
+  const handleDeleteAccount = useCallback(async (account) => {
+    // Never delete an account that still has history hanging off it.
+    const remaining = await getAppointmentsForReg(`appointments${locationSuffix}`, account.id);
+
+    if (remaining.length > 0) {
+      const label = remaining.length === 1 ? '1 appointment' : `${remaining.length} appointments`;
+      window.alert(
+        `${account.vehicleReg || account.id} still has ${label}.
+
+`
+        + 'Open its History and move them to the correct reg first, otherwise that work '
+        + 'would no longer belong to any account.'
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete the account ${account.vehicleReg || account.id}?
+
+`
+      + 'It has no appointments left. This cannot be undone.'
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeleting(true);
+      await deleteAccount(accountsCollectionName, account.id);
+      setAccounts((prev) => prev.filter((a) => a.id !== account.id));
+      setEditingAccount(null);
+      setMaintenanceMessage(`Deleted account ${account.vehicleReg || account.id}.`);
+    } catch (error) {
+      console.error('Failed to delete account:', error);
+      window.alert('Could not delete the account. Please try again.');
+    } finally {
+      setDeleting(false);
+    }
+  }, [accountsCollectionName, locationSuffix]);
 
   // Memoize appointment toggle handler
   const handleToggleAppointment = useCallback((appointmentId) => {
@@ -343,6 +396,7 @@ const AccountsPage = () => {
   const handleEditOpen = useCallback((account) => {
     setEditingAccount(account);
     setEditFields({
+      vehicleReg: account.vehicleReg || account.id || '',
       customerName: account.customerName || '',
       customerPhone: account.customerPhone || '',
       vehicleMake: account.vehicleMake || '',
@@ -369,32 +423,102 @@ const AccountsPage = () => {
 
   const handleEditSave = useCallback(async () => {
     if (!editingAccount) return;
+
+    const editedFields = {
+      customerName: editFields.customerName,
+      customerPhone: editFields.customerPhone,
+      vehicleMake: editFields.vehicleMake,
+      customerNotes: (editFields.customerNotes || '').trim(),
+      flagged: editFields.flagged,
+      flaggedReason: editFields.flagged ? editFields.flaggedReason || '' : '',
+    };
+
+    const newReg = normalizeVehicleReg(editFields.vehicleReg);
+    const currentReg = normalizeVehicleReg(editingAccount.vehicleReg || editingAccount.id);
+    const regChanged = Boolean(newReg) && newReg !== currentReg;
+
+    if (!newReg) {
+      window.alert('Enter a vehicle registration.');
+      return;
+    }
+
+    if (regChanged) {
+      const appointments = await getAppointmentsForReg(`appointments${locationSuffix}`, currentReg);
+      const jobLabel = appointments.length === 1 ? '1 appointment' : `${appointments.length} appointments`;
+
+      const confirmed = window.confirm(
+        `Change ${currentReg} to ${newReg}?
+
+`
+        + `Its ${jobLabel} will move across with it, so no history is lost. `
+        + 'The old registration will no longer exist.'
+      );
+      if (!confirmed) return;
+    }
+
     setEditSaving(true);
     try {
-      const accountRef = doc(firestore, accountsCollectionName, editingAccount.id);
-      await updateDoc(accountRef, {
-        customerName: editFields.customerName,
-        customerPhone: editFields.customerPhone,
-        vehicleMake: editFields.vehicleMake,
-        customerNotes: (editFields.customerNotes || '').trim(),
-        flagged: editFields.flagged,
-        flaggedReason: editFields.flagged ? editFields.flaggedReason || '' : '',
-      });
-      // Update local state
-      setAccounts(prev =>
-        prev.map(a =>
-          a.id === editingAccount.id
-            ? { ...a, ...editFields }
-            : a
-        )
-      );
+      if (regChanged) {
+        // The reg is the document id, so this recreates the account and brings
+        // its appointments along.
+        const { movedCount } = await renameAccountReg({
+          accountsCollectionName,
+          appointmentsCollectionName: `appointments${locationSuffix}`,
+          account: { ...editingAccount, ...editedFields },
+          newReg,
+        });
+
+        await loadAccounts();
+        setSelectedAccount(null);
+        setServiceHistory([]);
+        setMaintenanceMessage(
+          `Changed ${currentReg} to ${newReg}`
+          + (movedCount > 0 ? ` and moved ${movedCount === 1 ? '1 appointment' : `${movedCount} appointments`}.` : '.')
+        );
+      } else {
+        await updateDoc(doc(firestore, accountsCollectionName, editingAccount.id), editedFields);
+        setAccounts(prev =>
+          prev.map(a => (a.id === editingAccount.id ? { ...a, ...editedFields } : a))
+        );
+      }
+
       setEditingAccount(null);
     } catch (err) {
       console.error('Error updating account:', err);
+      window.alert(err.message || 'Could not save the account. Please try again.');
     } finally {
       setEditSaving(false);
     }
-  }, [editingAccount, editFields, accountsCollectionName]);
+  }, [editingAccount, editFields, accountsCollectionName, locationSuffix, loadAccounts]);
+
+  const handleExport = useCallback(async () => {
+    try {
+      setExporting(true);
+      setMaintenanceMessage('');
+
+      const result = await exportAccountsWorkbook({
+        accounts,
+        appointmentsCollectionName: `appointments${locationSuffix}`,
+        locationSuffix,
+        locationKey: getLocationKey(),
+      });
+
+      window.alert(
+        `Exported ${result.accountCount} accounts and ${result.historyCount} jobs to ${result.fileName}.
+
+`
+        + `${result.dueSoonCount} due a service within ${result.dueSoonDays} days `
+        + `(estimated as last service + ${result.intervalMonths} months).`
+      );
+    } catch (error) {
+      console.error('Failed to export accounts:', error);
+      window.alert(`Could not build the export.
+
+${error?.message || error}`);
+    } finally {
+      setExporting(false);
+    }
+  }, [accounts, locationSuffix]);
 
   return (
     <div className="accounts-page-shell">
@@ -446,6 +570,15 @@ const AccountsPage = () => {
                 <Typography variant="body2" className="accounts-results-count">
                   {displayAccounts.length} accounts
                 </Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleExport}
+                  className="accounts-edit-btn"
+                  disabled={exporting || accounts.length === 0}
+                >
+                  {exporting ? 'Exporting...' : 'Export'}
+                </Button>
                 <Tooltip title={showFlaggedOnly ? 'Showing flagged accounts' : 'View all flagged accounts'}>
                   <Button
                     variant="text"
@@ -460,6 +593,11 @@ const AccountsPage = () => {
                 </Tooltip>
               </Box>
             </Box>
+            {maintenanceMessage && !selectedAccount && (
+              <Typography variant="body2" className="accounts-move-note" sx={{ mb: 2 }}>
+                {maintenanceMessage}
+              </Typography>
+            )}
             <TableContainer className="accounts-table-container">
               <Table>
                 <TableHead>
@@ -498,11 +636,29 @@ const AccountsPage = () => {
             Service History for {selectedAccount}
           </DialogTitle>
           <DialogContent dividers className="accounts-modal-content">
+            {maintenanceMessage && (
+              <Typography variant="body2" className="accounts-move-note" sx={{ mb: 2 }}>
+                {maintenanceMessage}
+              </Typography>
+            )}
+            {serviceHistory.length > 0 && (
+              <Box className="accounts-history-actions">
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleMoveAll}
+                  className="accounts-edit-btn"
+                >
+                  Move all to another reg
+                </Button>
+              </Box>
+            )}
             {serviceHistory.length > 0 ? (
               serviceHistory.map(appointment => (
                 <AppointmentEntry
                   key={appointment.id}
                   appointment={appointment}
+                  onMove={handleMoveOne}
                   onToggle={handleToggleAppointment}
                 />
               ))
@@ -516,6 +672,17 @@ const AccountsPage = () => {
             </Button>
           </DialogActions>
         </Dialog>
+
+        <MoveAppointmentsDialog
+          open={moveDialogOpen}
+          sourceReg={selectedAccount || ''}
+          appointmentsToMove={appointmentsToMove}
+          allAppointmentsForReg={allAppointmentsForReg}
+          accountsCollectionName={accountsCollectionName}
+          appointmentsCollectionName={`appointments${locationSuffix}`}
+          onMoved={handleMoved}
+          onClose={() => { setMoveDialogOpen(false); setAppointmentsToMove([]); }}
+        />
 
         {/* Edit Account Modal */}
         <Dialog
@@ -536,12 +703,15 @@ const AccountsPage = () => {
               </Typography>
               <TextField
                 fullWidth
-                value={editingAccount?.vehicleReg || ''}
+                name="vehicleReg"
+                value={editFields.vehicleReg || ''}
+                onChange={(e) => setEditFields((prev) => ({
+                  ...prev,
+                  vehicleReg: e.target.value.toUpperCase(),
+                }))}
                 variant="outlined"
                 size="small"
-                disabled
-                helperText="Vehicle registration cannot be changed"
-                className="accounts-edit-reg-field"
+                helperText="Changing this moves the account and its history to the new reg"
               />
             </Box>
             <Box sx={{ mb: 2 }}>
@@ -655,7 +825,16 @@ const AccountsPage = () => {
               )}
             </Box>
           </DialogContent>
-          <DialogActions>
+          <DialogActions className="accounts-edit-actions">
+            <Button
+              variant="text"
+              onClick={() => handleDeleteAccount(editingAccount)}
+              className="accounts-delete-btn"
+              disabled={deleting || editSaving}
+            >
+              {deleting ? 'Deleting...' : 'Delete Account'}
+            </Button>
+            <Box sx={{ flex: 1 }} />
             <Button onClick={() => setEditingAccount(null)} variant="outlined" className="accounts-cancel-btn">
               Cancel
             </Button>

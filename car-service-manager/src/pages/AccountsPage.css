@@ -427,3 +427,56 @@
 }
   
   
+/* Account maintenance: moving history, deleting accounts */
+.accounts-history-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.accounts-edit-actions {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+}
+
+.accounts-delete-btn {
+  color: #8a9ab5 !important;
+  text-transform: none !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+}
+
+.accounts-delete-btn:hover {
+  color: #c23b22 !important;
+  background: #fff1ef !important;
+}
+
+.accounts-move-lookup {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.accounts-move-note {
+  color: #5d6780 !important;
+}
+
+.accounts-move-warning {
+  color: #8a5300 !important;
+  font-weight: 600 !important;
+}
+
+.accounts-move-error {
+  color: #c23b22 !important;
+  font-weight: 600 !important;
+}
+
+.accounts-move-target {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid #cfe3d4;
+  border-radius: 10px;
+  background: #f4fbf6;
+  color: #344054;
+}

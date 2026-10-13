@@ -18,16 +18,17 @@
     "react-router-dom": "^6.24.1",
     "react-scripts": "5.0.1",
     "react-to-print": "^2.15.1",
-    "web-vitals": "^2.1.4"
+    "web-vitals": "^2.1.4",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "optionalDependencies": {
-    "@mui/material": "^5.14.7",
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.14.0",
+    "@mui/material": "^5.14.7",
     "@mui/x-date-pickers": "^6.0.0",
-    "date-fns": "^2.30.0",
     "chart.js": "^4.4.0",
+    "date-fns": "^2.30.0",
     "react-chartjs-2": "^5.2.0"
   },
   "scripts": {
