@@ -293,6 +293,18 @@
   font-weight: 500 !important;
 }
 
+.accounts-summary-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+
+.accounts-summary-mileage {
+  color: #5d6780 !important;
+  font-weight: 500 !important;
+}
+
 .accounts-toggle-icon {
   color: #5d6780;
   display: flex;

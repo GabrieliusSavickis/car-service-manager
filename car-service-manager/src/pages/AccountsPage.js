@@ -83,6 +83,47 @@ const AccountTableRow = memo(({ account, onViewHistory, onEdit }) => (
   </TableRow>
 ));
 
+// Collapse the segments of a multi-day job into one history entry. Appointments
+// saved before group ids existed have none, so they key on their own doc id and
+// can never be merged with anything else. Nothing is written or deleted here -
+// this only decides what the history list shows.
+const dedupeAppointmentSegments = (appointments) => {
+  const byGroup = new Map();
+
+  appointments.forEach((appointment) => {
+    const key = appointment.appointmentGroupId || appointment.id;
+    const existing = byGroup.get(key);
+
+    if (!existing) {
+      byGroup.set(key, { ...appointment, segmentCount: 1 });
+      return;
+    }
+
+    const segmentCount = existing.segmentCount + 1;
+
+    // Show the first day of a split job: the anchor doc, else the earliest segment.
+    const existingIsAnchor = existing.id === existing.appointmentGroupId;
+    const candidateIsAnchor = appointment.id === appointment.appointmentGroupId;
+
+    let kept = existing;
+    if (candidateIsAnchor && !existingIsAnchor) {
+      kept = appointment;
+    } else if (!candidateIsAnchor && !existingIsAnchor && appointment.sortTime < existing.sortTime) {
+      kept = appointment;
+    }
+
+    byGroup.set(key, { ...kept, segmentCount });
+  });
+
+  return [...byGroup.values()];
+};
+
+const formatMileage = (mileage) => {
+  const raw = (mileage ?? '').toString().trim();
+  if (!raw) return 'Not recorded';
+  return /^\d+$/.test(raw) ? Number(raw).toLocaleString('en-IE') : raw;
+};
+
 // Memoized Appointment Entry Component
 const AppointmentEntry = memo(({ appointment, onToggle }) => (
   <Box className="accounts-appointment-entry">
@@ -91,9 +132,19 @@ const AppointmentEntry = memo(({ appointment, onToggle }) => (
       onClick={() => onToggle(appointment.id)}
     >
       <Box className="accounts-summary-row">
-        <Typography variant="body2" className="accounts-summary-text">
-          <strong>Date:</strong> {appointment.formattedDateTime}
-        </Typography>
+        <Box className="accounts-summary-main">
+          <Typography variant="body2" className="accounts-summary-text">
+            <strong>Date:</strong> {appointment.formattedDateTime}
+          </Typography>
+          <Typography variant="body2" className="accounts-summary-mileage">
+            <strong>Mileage:</strong> {formatMileage(appointment.details?.mileage)}
+          </Typography>
+          {appointment.segmentCount > 1 && (
+            <Typography variant="body2" className="accounts-summary-mileage">
+              {appointment.segmentCount} days
+            </Typography>
+          )}
+        </Box>
         <span className="accounts-toggle-icon">
           {appointment.isOpen ? <FaChevronUp /> : <FaChevronDown />}
         </span>
@@ -251,6 +302,9 @@ const AccountsPage = () => {
         hour12: false, // Use 24-hour format
       };
       const formattedDateTime = dateTime.toLocaleString('en-US', options);
+      const sortTime = Number.isNaN(dateTime.getTime())
+        ? (new Date(date).getTime() || 0)
+        : dateTime.getTime();
 
       // Lookup technician name if using ID
       let technicianName = appointment.tech;
@@ -263,12 +317,16 @@ const AccountsPage = () => {
         ...appointment,
         technicianName, // Add the resolved technician name
         formattedDateTime,
+        sortTime,
         isOpen: false, // Add isOpen property
       };
     }));
 
+    const history = dedupeAppointmentSegments(appointmentsList)
+      .sort((a, b) => b.sortTime - a.sortTime);
+
     setSelectedAccount(vehicleReg);
-    setServiceHistory(appointmentsList);
+    setServiceHistory(history);
   }, [locationSuffix]);
 
   // Memoize appointment toggle handler
