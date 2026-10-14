@@ -128,7 +128,7 @@ const loadAppointmentsByReg = async (appointmentsCollectionName) => {
   const byReg = new Map();
 
   snapshot.docs.forEach((appointmentDoc) => {
-    const appointment = { id: appointmentDoc.id, ...appointmentDoc.data() };
+    const appointment = { ...appointmentDoc.data(), id: appointmentDoc.id };
     const reg = normalizeVehicleReg(appointment.details?.vehicleReg);
     if (!reg) return;
 

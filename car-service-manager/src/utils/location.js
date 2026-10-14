@@ -20,6 +20,16 @@ export const LOCATION_OPTIONS = [
  * @returns {string} '_ennis' for the Ennis site, '' for the main (Kerry) site
  */
 export const getLocationSuffix = () => {
+  // Local override for development: set REACT_APP_LOCATION=ennis in .env.local
+  // to work against the Ennis site while still running on localhost. Ignored in
+  // production builds, so a stray .env.local can never point the live Kerry
+  // site at Ennis data.
+  if (process.env.NODE_ENV === 'development') {
+    const override = (process.env.REACT_APP_LOCATION || '').trim().toLowerCase();
+    if (override === LOCATION_KEYS.ENNIS) return '_ennis';
+    if (override === LOCATION_KEYS.MAIN) return '';
+  }
+
   const hostname = window.location.hostname;
   return hostname.includes('asgennislive.ie') ? '_ennis' : '';
 };

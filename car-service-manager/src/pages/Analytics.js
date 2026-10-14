@@ -19,6 +19,7 @@ import {
 import Header from '../components/Header/Header';
 import './Analytics.css';
 import { getTechnicians } from '../utils/technicianUtils';
+import { getLocationKey, getLocationSuffix } from '../utils/location';
 import { firestore } from '../firebase';
 import {
   addDoc,
@@ -170,13 +171,8 @@ const calculateSummary = (records) => {
 };
 
 const Analytics = () => {
-  const locationSuffix = useMemo(() => {
-    const hostname = window.location.hostname;
-    if (hostname.includes('asgennislive.ie')) return '_ennis';
-    if (hostname.includes('asglive.ie')) return '';
-    return '';
-  }, []);
-  const locationKey = locationSuffix === '_ennis' ? 'ennis' : 'main';
+  const locationSuffix = useMemo(() => getLocationSuffix(), []);
+  const locationKey = useMemo(() => getLocationKey(), []);
 
   const recordsCollectionName = `manual_weekly_appointments${locationSuffix}`;
   const settingsDocRef = useMemo(() => doc(firestore, 'analytics_settings', locationKey), [locationKey]);

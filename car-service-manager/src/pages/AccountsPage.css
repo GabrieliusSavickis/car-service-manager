@@ -480,3 +480,61 @@
   background: #f4fbf6;
   color: #344054;
 }
+
+/* Target account picker */
+.accounts-reg-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #eef2f8;
+  color: #1a202c;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: pre;
+}
+
+.accounts-reg-flag {
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8a5300;
+}
+
+.accounts-target-list {
+  margin-top: 10px;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid #e8edf6;
+  border-radius: 10px;
+}
+
+.accounts-target-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f3f9;
+  cursor: pointer;
+}
+
+.accounts-target-option:last-child {
+  border-bottom: none;
+}
+
+.accounts-target-option:hover {
+  background: #f9fbff;
+}
+
+.accounts-target-option--selected {
+  background: #f4fbf6;
+  box-shadow: inset 3px 0 0 #28a745;
+}
+
+.accounts-target-tick {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1b6b2f;
+  white-space: nowrap;
+}

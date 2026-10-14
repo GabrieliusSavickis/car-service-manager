@@ -6,6 +6,7 @@ import { collection, query, where, getDocs, setDoc, doc, getDoc, limit } from 'f
 import PrintableJobCard from '../PrintableJobCard/PrintableJobCard';
 import ReactToPrint from 'react-to-print';
 import { getTechnicians } from '../../utils/technicianUtils';
+import { getLocationSuffix } from '../../utils/location';
 import {
   PARTS_STATUS,
   PARTS_STATUS_OPTIONS,
@@ -97,15 +98,7 @@ const getSafeRescheduleTime = (time) => {
 
 function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, startTime }) {
 
-  // Determine the domain
-  const hostname = window.location.hostname;
-  let locationSuffix = '';
-
-  if (hostname.includes('asgennislive.ie')) {
-    locationSuffix = '_ennis'; // Ennis site
-  } else if (hostname.includes('asglive.ie')) {
-    locationSuffix = ''; // Main site
-  }
+  const locationSuffix = getLocationSuffix();
 
   // Define the collection names
   const accountsCollectionName = 'accounts' + locationSuffix;

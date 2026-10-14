@@ -1,6 +1,7 @@
 import React, { forwardRef, useState, useEffect } from 'react';
 import './PrintableJobCard.css';
 import { getTechnicianName } from '../../utils/technicianUtils';
+import { getLocationSuffix } from '../../utils/location';
 import { PARTS_STATUS, getPartsStatus, getPartsStatusLabel } from '../../utils/partsStatus';
 
 const PrintableJobCard = forwardRef(({ appointment }, ref) => {
@@ -16,15 +17,7 @@ const PrintableJobCard = forwardRef(({ appointment }, ref) => {
 
   useEffect(() => {
     const loadTechnicianName = async () => {
-      // Determine the domain
-      const hostname = window.location.hostname;
-      let locationSuffix = '';
-
-      if (hostname.includes('asgennislive.ie')) {
-        locationSuffix = '_ennis'; // Ennis site
-      } else if (hostname.includes('asglive.ie')) {
-        locationSuffix = ''; // Main site
-      }
+      const locationSuffix = getLocationSuffix();
 
       if (appointment?.techId) {
         const name = await getTechnicianName(appointment.techId, locationSuffix);

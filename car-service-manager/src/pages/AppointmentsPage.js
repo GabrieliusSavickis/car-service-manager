@@ -9,17 +9,10 @@ import DatePicker from '../components/DatePicker/DatePicker';
 import './AppointmentsPage.css';
 import { getTechnicians, clearTechniciansCache } from '../utils/technicianUtils';
 import { describeEntryWindow, entryCoversTime } from '../utils/unavailability';
+import { getLocationSuffix } from '../utils/location';
 
 function AppointmentsPage() {
-  // Determine the domain
-  const hostname = window.location.hostname;
-  let locationSuffix = '';
-
-  if (hostname.includes('asgennislive.ie')) {
-    locationSuffix = '_ennis'; // Ennis site
-  } else if (hostname.includes('asglive.ie')) {
-    locationSuffix = ''; // Main site
-  }
+  const locationSuffix = getLocationSuffix();
 
   // Define the collection names
   const appointmentsCollectionName = 'appointments' + locationSuffix;
@@ -195,7 +188,7 @@ function AppointmentsPage() {
       const unsubscribe = onSnapshot(q, async (querySnapshot) => {
         const fetchedAppointments = [];
         querySnapshot.forEach(doc => {
-          fetchedAppointments.push({ id: doc.id, ...doc.data() });
+          fetchedAppointments.push({ ...doc.data(), id: doc.id });
         });
         const enrichedAppointments = await enrichAppointmentsWithFlagMeta(fetchedAppointments);
         setAppointments(enrichedAppointments);
@@ -466,7 +459,7 @@ function AppointmentsPage() {
       const groupedSnapshot = await getDocs(groupedQuery);
 
       const groupedDocs = groupedSnapshot.docs
-        .map((groupedDoc) => ({ id: groupedDoc.id, ...groupedDoc.data() }));
+        .map((groupedDoc) => ({ ...groupedDoc.data(), id: groupedDoc.id }));
 
       if (groupedDocs.length > 0) {
         // The anchor is always the doc whose id equals appointmentGroupId
@@ -699,7 +692,7 @@ function AppointmentsPage() {
 
     const appointmentsOnNextDay = [];
     querySnapshot.forEach(doc => {
-      appointmentsOnNextDay.push({ id: doc.id, ...doc.data() });
+      appointmentsOnNextDay.push({ ...doc.data(), id: doc.id });
     });
 
     const spanStartIndex = 0;

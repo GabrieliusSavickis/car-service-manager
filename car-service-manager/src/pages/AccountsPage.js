@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { firestore } from '../firebase';
-import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 import MoveAppointmentsDialog from '../components/Accounts/MoveAppointmentsDialog';
 import {
   deleteAccount,
-  getAppointmentsForReg,
+  describeReg,
+  getAppointmentsForAccount,
   normalizeVehicleReg,
   renameAccountReg,
 } from '../utils/accountMaintenance';
 import { exportAccountsWorkbook } from '../utils/accountsExport';
 import { dedupeAppointmentSegments } from '../utils/serviceHistory';
 import { getLocationKey } from '../utils/location';
+import { getLocationSuffix } from '../utils/location';
 import Header from '../components/Header/Header';
 import './AccountsPage.css';
 import { useNavigate } from 'react-router-dom';
@@ -83,7 +85,7 @@ const AccountTableRow = memo(({ account, onViewHistory, onEdit }) => (
         <Button
           variant="contained"
           size="small"
-          onClick={() => onViewHistory(account.vehicleReg)}
+          onClick={() => onViewHistory(account)}
           className="accounts-primary-btn"
         >
           History
@@ -170,15 +172,7 @@ const AppointmentEntry = memo(({ appointment, onToggle, onMove }) => (
 ));
 
 const AccountsPage = () => {
-  // Determine the domain
-  const hostname = window.location.hostname;
-  let locationSuffix = '';
-
-  if (hostname.includes('asgennislive.ie')) {
-    locationSuffix = '_ennis'; // Ennis site
-  } else if (hostname.includes('asglive.ie')) {
-    locationSuffix = ''; // Main site
-  }
+  const locationSuffix = getLocationSuffix();
 
   // Define the collection names
   const accountsCollectionName = 'accounts' + locationSuffix;
@@ -196,7 +190,7 @@ const AccountsPage = () => {
   const [editSaving, setEditSaving] = useState(false);
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
   const [appointmentsToMove, setAppointmentsToMove] = useState([]);
-  const [allAppointmentsForReg, setAllAppointmentsForReg] = useState([]);
+  const [allAppointmentsForAccount, setAllAppointmentsForAccount] = useState([]);
   const [maintenanceMessage, setMaintenanceMessage] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -248,7 +242,7 @@ const AccountsPage = () => {
   const loadAccounts = useCallback(async () => {
     const accountsCollection = collection(firestore, accountsCollectionName);
     const accountsSnapshot = await getDocs(accountsCollection);
-    const accountsList = accountsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const accountsList = accountsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
     setAccounts(accountsList);
   }, [accountsCollectionName]);
 
@@ -270,12 +264,10 @@ const AccountsPage = () => {
     setShowFlaggedOnly((prev) => !prev);
   }, []);
 
-  const handleViewServiceHistory = useCallback(async (vehicleReg) => {
-    const appointmentsRef = collection(firestore, `appointments${locationSuffix}`);
-    const q = query(appointmentsRef, where('details.vehicleReg', '==', vehicleReg));
-    const querySnapshot = await getDocs(q);
-    const appointmentsList = await Promise.all(querySnapshot.docs.map(async (doc) => {
-      const appointment = doc.data();
+  const handleViewServiceHistory = useCallback(async (account) => {
+    const rawAppointments = await getAppointmentsForAccount(`appointments${locationSuffix}`, account);
+    const appointmentsList = await Promise.all(rawAppointments.map(async (rawAppointment) => {
+      const { id: appointmentId, ...appointment } = rawAppointment;
       // Combine date and startTime
       const date = appointment.date; // Assuming this is a string like "Wed Sep 25 2024"
       const time = appointment.startTime || appointment.details.startTime; // Get startTime from appointment
@@ -304,8 +296,8 @@ const AccountsPage = () => {
       }
 
       return {
-        id: doc.id,
         ...appointment,
+        id: appointmentId,
         technicianName, // Add the resolved technician name
         formattedDateTime,
         sortTime,
@@ -316,9 +308,9 @@ const AccountsPage = () => {
     const history = dedupeAppointmentSegments(appointmentsList)
       .sort((a, b) => b.sortTime - a.sortTime);
 
-    setSelectedAccount(vehicleReg);
+    setSelectedAccount(account);
     setServiceHistory(history);
-    setAllAppointmentsForReg(appointmentsList);
+    setAllAppointmentsForAccount(appointmentsList);
     setMaintenanceMessage('');
   }, [locationSuffix]);
 
@@ -328,30 +320,36 @@ const AccountsPage = () => {
   }, []);
 
   const handleMoveAll = useCallback(() => {
-    setAppointmentsToMove(allAppointmentsForReg);
+    setAppointmentsToMove(allAppointmentsForAccount);
     setMoveDialogOpen(true);
-  }, [allAppointmentsForReg]);
+  }, [allAppointmentsForAccount]);
 
-  const handleMoved = useCallback(async (movedCount, targetAccount) => {
+  const handleMoved = useCallback(async (movedCount, targetAccount, missing = []) => {
     setMoveDialogOpen(false);
     setAppointmentsToMove([]);
 
-    const targetReg = targetAccount.vehicleReg || targetAccount.id;
     const label = movedCount === 1 ? '1 appointment' : `${movedCount} appointments`;
+    // Name what was skipped, so it can be chased up rather than just counted.
+    const skipped = missing.length > 0
+      ? ` Skipped ${missing.length}, not found in the database: `
+        + missing.map((m) => `${m.date}${m.startTime ? ` ${m.startTime}` : ''} (ref ${m.id})`).join(', ')
+        + '.'
+      : '';
 
     // Reload this account's history so what is left is accurate.
     await handleViewServiceHistory(selectedAccount);
-    setMaintenanceMessage(`Moved ${label} to ${targetReg}.`);
-  }, [handleViewServiceHistory, selectedAccount]);
+    await loadAccounts();
+    setMaintenanceMessage(`Moved ${label} to ${targetAccount.id}.${skipped}`);
+  }, [handleViewServiceHistory, selectedAccount, loadAccounts]);
 
   const handleDeleteAccount = useCallback(async (account) => {
     // Never delete an account that still has history hanging off it.
-    const remaining = await getAppointmentsForReg(`appointments${locationSuffix}`, account.id);
+    const remaining = await getAppointmentsForAccount(`appointments${locationSuffix}`, account);
 
     if (remaining.length > 0) {
       const label = remaining.length === 1 ? '1 appointment' : `${remaining.length} appointments`;
       window.alert(
-        `${account.vehicleReg || account.id} still has ${label}.
+        `${describeReg(account.id)} still has ${label}.
 
 `
         + 'Open its History and move them to the correct reg first, otherwise that work '
@@ -361,7 +359,7 @@ const AccountsPage = () => {
     }
 
     const confirmed = window.confirm(
-      `Delete the account ${account.vehicleReg || account.id}?
+      `Delete the account ${describeReg(account.id)}?
 
 `
       + 'It has no appointments left. This cannot be undone.'
@@ -373,7 +371,8 @@ const AccountsPage = () => {
       await deleteAccount(accountsCollectionName, account.id);
       setAccounts((prev) => prev.filter((a) => a.id !== account.id));
       setEditingAccount(null);
-      setMaintenanceMessage(`Deleted account ${account.vehicleReg || account.id}.`);
+      setSelectedAccount(null);
+      setMaintenanceMessage(`Deleted account ${describeReg(account.id)}.`);
     } catch (error) {
       console.error('Failed to delete account:', error);
       window.alert('Could not delete the account. Please try again.');
@@ -434,7 +433,7 @@ const AccountsPage = () => {
     };
 
     const newReg = normalizeVehicleReg(editFields.vehicleReg);
-    const currentReg = normalizeVehicleReg(editingAccount.vehicleReg || editingAccount.id);
+    const currentReg = editingAccount.id;
     const regChanged = Boolean(newReg) && newReg !== currentReg;
 
     if (!newReg) {
@@ -443,11 +442,11 @@ const AccountsPage = () => {
     }
 
     if (regChanged) {
-      const appointments = await getAppointmentsForReg(`appointments${locationSuffix}`, currentReg);
+      const appointments = await getAppointmentsForAccount(`appointments${locationSuffix}`, editingAccount);
       const jobLabel = appointments.length === 1 ? '1 appointment' : `${appointments.length} appointments`;
 
       const confirmed = window.confirm(
-        `Change ${currentReg} to ${newReg}?
+        `Change ${describeReg(currentReg)} to ${newReg}?
 
 `
         + `Its ${jobLabel} will move across with it, so no history is lost. `
@@ -461,7 +460,7 @@ const AccountsPage = () => {
       if (regChanged) {
         // The reg is the document id, so this recreates the account and brings
         // its appointments along.
-        const { movedCount } = await renameAccountReg({
+        const { movedCount, missing } = await renameAccountReg({
           accountsCollectionName,
           appointmentsCollectionName: `appointments${locationSuffix}`,
           account: { ...editingAccount, ...editedFields },
@@ -472,8 +471,11 @@ const AccountsPage = () => {
         setSelectedAccount(null);
         setServiceHistory([]);
         setMaintenanceMessage(
-          `Changed ${currentReg} to ${newReg}`
+          `Changed ${describeReg(currentReg)} to ${newReg}`
           + (movedCount > 0 ? ` and moved ${movedCount === 1 ? '1 appointment' : `${movedCount} appointments`}.` : '.')
+          + (missing.length > 0
+            ? ` Skipped ${missing.length}, not found: ${missing.map((m) => `${m.date} (ref ${m.id})`).join(', ')}.`
+            : '')
         );
       } else {
         await updateDoc(doc(firestore, accountsCollectionName, editingAccount.id), editedFields);
@@ -633,7 +635,7 @@ ${error?.message || error}`);
           className="accounts-modal"
         >
           <DialogTitle className="accounts-modal-title">
-            Service History for {selectedAccount}
+            Service History for {selectedAccount?.id}
           </DialogTitle>
           <DialogContent dividers className="accounts-modal-content">
             {maintenanceMessage && (
@@ -675,10 +677,10 @@ ${error?.message || error}`);
 
         <MoveAppointmentsDialog
           open={moveDialogOpen}
-          sourceReg={selectedAccount || ''}
+          sourceAccount={selectedAccount}
+          accounts={accounts}
           appointmentsToMove={appointmentsToMove}
-          allAppointmentsForReg={allAppointmentsForReg}
-          accountsCollectionName={accountsCollectionName}
+          allAppointmentsForAccount={allAppointmentsForAccount}
           appointmentsCollectionName={`appointments${locationSuffix}`}
           onMoved={handleMoved}
           onClose={() => { setMoveDialogOpen(false); setAppointmentsToMove([]); }}

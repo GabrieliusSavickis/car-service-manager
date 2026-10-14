@@ -10,78 +10,61 @@ import {
   Typography,
 } from '@mui/material';
 import {
+  describeReg,
   expandToFullGroups,
-  findAccountByReg,
   moveAppointmentsToAccount,
   normalizeVehicleReg,
 } from '../../utils/accountMaintenance';
 
+const MAX_SUGGESTIONS = 8;
+
 function MoveAppointmentsDialog({
   open,
-  sourceReg,
+  sourceAccount,
+  accounts,
   appointmentsToMove,
-  allAppointmentsForReg,
-  accountsCollectionName,
+  allAppointmentsForAccount,
   appointmentsCollectionName,
   onMoved,
   onClose,
 }) {
-  const [targetRegInput, setTargetRegInput] = useState('');
+  const [search, setSearch] = useState('');
   const [targetAccount, setTargetAccount] = useState(null);
-  const [lookupMessage, setLookupMessage] = useState('');
-  const [checking, setChecking] = useState(false);
   const [moving, setMoving] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (open) {
-      setTargetRegInput('');
+      // Pre-fill with the source reg so the likely duplicate is the first thing listed.
+      setSearch(normalizeVehicleReg(sourceAccount?.id || ''));
       setTargetAccount(null);
-      setLookupMessage('');
       setError('');
     }
-  }, [open]);
+  }, [open, sourceAccount]);
 
   // Pull in sibling segments so a split job never lands half on each account.
   const expandedAppointments = useMemo(() => (
-    expandToFullGroups(appointmentsToMove || [], allAppointmentsForReg || [])
-  ), [appointmentsToMove, allAppointmentsForReg]);
+    expandToFullGroups(appointmentsToMove || [], allAppointmentsForAccount || [])
+  ), [appointmentsToMove, allAppointmentsForAccount]);
 
   const addedSegmentCount = expandedAppointments.length - (appointmentsToMove || []).length;
 
-  const handleCheckTarget = async () => {
-    const normalizedReg = normalizeVehicleReg(targetRegInput);
-    setTargetAccount(null);
-    setError('');
-
-    if (!normalizedReg) {
-      setLookupMessage('Enter a registration to move these to.');
-      return;
-    }
-
-    if (normalizedReg === normalizeVehicleReg(sourceReg)) {
-      setLookupMessage('That is the same account these are already on.');
-      return;
-    }
-
-    try {
-      setChecking(true);
-      const account = await findAccountByReg(accountsCollectionName, normalizedReg);
-
-      if (!account) {
-        setLookupMessage(`No account found for ${normalizedReg}. Check the registration.`);
-        return;
-      }
-
-      setTargetAccount(account);
-      setLookupMessage('');
-    } catch (lookupError) {
-      console.error('Failed to look up account:', lookupError);
-      setLookupMessage('Could not check that registration. Please try again.');
-    } finally {
-      setChecking(false);
-    }
-  };
+  // Match on the squashed reg so hyphens and spaces do not hide the match, but
+  // always select by document id so two near-identical regs stay distinct.
+  const suggestions = useMemo(() => {
+    const term = normalizeVehicleReg(search);
+    return (accounts || [])
+      .filter((account) => account.id !== sourceAccount?.id)
+      .filter((account) => {
+        if (!term) return true;
+        const haystack = [account.id, account.vehicleReg, account.customerName, account.customerPhone]
+          .filter(Boolean)
+          .map((value) => normalizeVehicleReg(value))
+          .join(' ');
+        return haystack.includes(term);
+      })
+      .slice(0, MAX_SUGGESTIONS);
+  }, [accounts, search, sourceAccount]);
 
   const handleMove = async () => {
     if (!targetAccount) return;
@@ -90,16 +73,16 @@ function MoveAppointmentsDialog({
       setMoving(true);
       setError('');
 
-      const movedCount = await moveAppointmentsToAccount({
+      const { movedCount, missing } = await moveAppointmentsToAccount({
         appointmentsCollectionName,
         appointments: expandedAppointments,
         targetAccount,
       });
 
-      onMoved(movedCount, targetAccount);
+      onMoved(movedCount, targetAccount, missing);
     } catch (moveError) {
       console.error('Failed to move appointments:', moveError);
-      setError('Could not move the appointments. Nothing was changed.');
+      setError(moveError?.message || 'Could not move the appointments.');
     } finally {
       setMoving(false);
     }
@@ -113,14 +96,15 @@ function MoveAppointmentsDialog({
     <Dialog
       open={open}
       onClose={moving ? undefined : onClose}
-      maxWidth="xs"
+      maxWidth="sm"
       fullWidth
       className="accounts-modal"
     >
       <DialogTitle className="accounts-modal-title">Move Appointments</DialogTitle>
       <DialogContent dividers className="accounts-modal-content">
         <Typography variant="body2" sx={{ mb: 2 }}>
-          Moving <strong>{movingLabel}</strong> off <strong>{sourceReg}</strong>.
+          Moving <strong>{movingLabel}</strong> off{' '}
+          <span className="accounts-reg-chip">{sourceAccount?.id}</span>
         </Typography>
 
         {addedSegmentCount > 0 && (
@@ -131,61 +115,58 @@ function MoveAppointmentsDialog({
           </Typography>
         )}
 
-        <Box sx={{ mb: 1 }}>
-          <Typography className="accounts-filter-label" sx={{ mb: 0.5 }}>
-            Move To Vehicle Reg
-          </Typography>
-          <Box className="accounts-move-lookup">
-            <TextField
-              fullWidth
-              size="small"
-              value={targetRegInput}
-              onChange={(e) => {
-                setTargetRegInput(e.target.value.toUpperCase());
-                setTargetAccount(null);
-                setLookupMessage('');
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleCheckTarget();
-                }
-              }}
-              placeholder="e.g. 12-KY-1234"
-              disabled={moving}
-            />
-            <Button
-              variant="outlined"
-              onClick={handleCheckTarget}
-              className="accounts-cancel-btn"
-              disabled={checking || moving}
-            >
-              {checking ? 'Checking...' : 'Check'}
-            </Button>
-          </Box>
+        <Typography className="accounts-filter-label" sx={{ mb: 0.5 }}>
+          Move To
+        </Typography>
+        <TextField
+          fullWidth
+          size="small"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setTargetAccount(null);
+          }}
+          placeholder="Search reg, name or phone"
+          disabled={moving}
+        />
+
+        <Typography variant="body2" className="accounts-move-note" sx={{ mt: 1 }}>
+          Pick the account from the list. Two regs can look identical but differ by a
+          space, so choose rather than type.
+        </Typography>
+
+        <Box className="accounts-target-list">
+          {suggestions.length === 0 && (
+            <Typography variant="body2" className="accounts-move-warning">
+              No other accounts match that search.
+            </Typography>
+          )}
+          {suggestions.map((account) => {
+            const isSelected = targetAccount?.id === account.id;
+            const hasWhitespace = /\s/.test(account.id);
+
+            return (
+              <Box
+                key={account.id}
+                className={`accounts-target-option${isSelected ? ' accounts-target-option--selected' : ''}`}
+                onClick={() => !moving && setTargetAccount(account)}
+              >
+                <Box>
+                  <span className="accounts-reg-chip">{account.id}</span>
+                  {hasWhitespace && (
+                    <span className="accounts-reg-flag">{describeReg(account.id).replace(account.id, '').trim()}</span>
+                  )}
+                  <Typography variant="body2" sx={{ mt: 0.5 }}>
+                    {account.customerName || 'No name on file'}
+                    {account.customerPhone ? ` - ${account.customerPhone}` : ''}
+                    {account.vehicleMake ? ` - ${account.vehicleMake}` : ''}
+                  </Typography>
+                </Box>
+                {isSelected && <span className="accounts-target-tick">Selected</span>}
+              </Box>
+            );
+          })}
         </Box>
-
-        {lookupMessage && (
-          <Typography variant="body2" className="accounts-move-warning">{lookupMessage}</Typography>
-        )}
-
-        {targetAccount && (
-          <Box className="accounts-move-target">
-            <Typography variant="body2" sx={{ fontWeight: 700 }}>
-              {targetAccount.vehicleReg || targetAccount.id}
-            </Typography>
-            <Typography variant="body2">
-              {targetAccount.customerName || 'No name on file'}
-              {targetAccount.customerPhone ? ` - ${targetAccount.customerPhone}` : ''}
-            </Typography>
-            {targetAccount.vehicleMake && (
-              <Typography variant="body2">{targetAccount.vehicleMake}</Typography>
-            )}
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              Check this is the right customer before moving.
-            </Typography>
-          </Box>
-        )}
 
         {error && (
           <Typography variant="body2" className="accounts-move-error" sx={{ mt: 2 }}>{error}</Typography>

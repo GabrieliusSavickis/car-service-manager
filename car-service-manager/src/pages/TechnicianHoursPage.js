@@ -7,6 +7,7 @@ import './TechnicianHoursPage.css';
 import Header from '../components/Header/Header';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCalendarAlt } from '@fortawesome/free-solid-svg-icons';
+import { getLocationSuffix } from '../utils/location';
 
 const TechnicianHoursPage = () => {
   const [startDate, setStartDate] = useState(new Date());
@@ -14,15 +15,7 @@ const TechnicianHoursPage = () => {
   const [technicianHours, setTechnicianHours] = useState([]);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
-  // Determine the domain and set the location suffix
-  const hostname = window.location.hostname;
-  let locationSuffix = '';
-
-  if (hostname.includes('asgennislive.ie')) {
-    locationSuffix = '_ennis'; // Ennis site
-  } else if (hostname.includes('asglive.ie')) {
-    locationSuffix = ''; // Main site
-  }
+  const locationSuffix = getLocationSuffix();
 
   // Define the collection name
   const appointmentsCollectionName = 'appointments' + locationSuffix;
