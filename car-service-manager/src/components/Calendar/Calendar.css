@@ -2,6 +2,13 @@
   display: grid;
   /* grid-template-columns: 100px repeat(4, 1fr); Adjust column sizes */
   background-color: #ddd;
+
+  /* Appointment blocks are sized in these two units, so the rows have to be
+     exactly this tall. Left to size themselves the rows follow the system
+     font's line height, which differs per machine, and a long block ends up
+     short of its last row. Change these to resize the grid. */
+  --calendar-row-height: 42px;
+  --calendar-lunch-height: 38px;
 }
 
 .calendar-header {
@@ -56,8 +63,14 @@
 
 .time-label {
   background-color: #f9f9f9;
-  padding: 10px;
+  padding: 0 10px;
   text-align: center;
+  /* Fixed height and centred, so the label can never stretch its row. */
+  height: var(--calendar-row-height);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .time-slot {
@@ -65,6 +78,8 @@
   border: 1px solid #ddd;
   position: relative;
   overflow: visible;
+  height: var(--calendar-row-height);
+  box-sizing: border-box;
 }
 
 .time-slot.unavailable-slot {
@@ -160,7 +175,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 38px; /* Adjust height if needed */
+  height: var(--calendar-lunch-height);
   font-weight: bold;
   z-index: 10; /* This makes the lunch break divider appear on top */
   color: #555;
@@ -177,12 +192,13 @@
   .calendar-container {
     grid-template-columns: 70px repeat(4, 1fr); /* Adjust for narrower screens */
     margin: 10px auto; /* Reduce margin on smaller screens */
+    --calendar-row-height: 36px;
+    --calendar-lunch-height: 30px;
   }
 
   .time-label {
-    display: inline-grid;
     width: 58px; /* Narrow time labels */
-    padding: 7px; /* Adjust padding for time labels */
+    padding: 0 7px; /* Adjust padding for time labels */
   }
 
   .appointment {
@@ -196,7 +212,6 @@
   }
 
   .lunch-break-divider {
-    height: 30px; /* Reduce height for lunch break divider */
     font-size: 1rem; /* Adjust font size for lunch label */
   }
 

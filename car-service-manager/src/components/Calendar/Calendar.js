@@ -4,6 +4,8 @@ import './Calendar.css';
 import { FaEdit, FaFlag, FaBox, FaBoxOpen, FaTruck } from 'react-icons/fa';
 import { PARTS_STATUS, getPartsStatus, getPartsStatusLabel } from '../../utils/partsStatus';
 import {
+  UNAVAILABILITY_SLOT_END_TIMES,
+  UNAVAILABILITY_TIME_SLOTS,
   describeEntryWindow,
   entryCoversTime,
   getEntrySlotCount,
@@ -18,18 +20,24 @@ const PARTS_BADGES = {
   [PARTS_STATUS.RECEIVED]: { icon: FaBox, className: 'appointment-parts-badge--received' },
 };
 
-// Define time slots excluding lunch
-const timeSlots = [
-  '09:00', '09:30',
-  '10:00', '10:30',
-  '11:00', '11:30',
-  '12:00',  // Morning ends at 12:00
-  '13:30',  // After lunch resumes at 13:30
-  '14:00', '14:30',
-  '15:00', '15:30',
-  '16:00', '16:30',
-  '17:00', '17:30',
-];
+// The bookable slots, excluding lunch. Shared with the unavailability picker so
+// the grid and the hours a mechanic can be booked out for stay in step.
+const timeSlots = UNAVAILABILITY_TIME_SLOTS;
+
+// What each slot above finishes at. A slot is half an hour, so these are not
+// simply the next slot's start: the 12:00 block ends at 12:30 and lunch follows,
+// and the 17:30 block is the last of the day but runs until 18:00.
+const slotEndTimes = UNAVAILABILITY_SLOT_END_TIMES;
+
+// The last slot before the lunch divider is drawn.
+const LUNCH_SLOT_INDEX = timeSlots.indexOf('12:00');
+
+// Every slot row is exactly --calendar-row-height tall and the lunch divider
+// exactly --calendar-lunch-height, both set in Calendar.css. Heights are worked
+// out from those rather than from a percentage of one slot, so a block always
+// finishes flush on the last row's inner edge.
+const ROW_HEIGHT = 'var(--calendar-row-height)';
+const LUNCH_HEIGHT = 'var(--calendar-lunch-height)';
 
 const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician, unavailabilityByTechId = {} }) => {
 
@@ -42,35 +50,42 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
     appointment.details.segmentExpectedTime ?? appointment.details.expectedTime
   );
 
-  const calculateAppointmentSpan = (appointment) => {
-    const startTimeIndex = timeSlots.indexOf(appointment.startTime);
-    let remainingSlots = getAppointmentDurationSlots(appointment);
-    let totalDuration = 0;
+  /**
+   * Work out which rows a block covers: how many bookable slots, and whether the
+   * lunch divider sits inside it. The divider is its own row of a different
+   * height, so it is kept separate from the slot count rather than counted as
+   * another slot.
+   * @param {string} startTime - The slot the block starts in
+   * @param {number} slots - How many half hour slots the job is booked for
+   * @returns {{slotCount: number, crossesLunch: boolean, span: number}}
+   */
+  const getAppointmentLayout = (startTime, slots) => {
+    const startIndex = timeSlots.indexOf(startTime);
+    if (startIndex === -1) return { slotCount: 0, crossesLunch: false, span: 0 };
 
-    for (let i = startTimeIndex; i < timeSlots.length; i++) {
-      if (remainingSlots <= 0) break;
+    // Never run past the end of the day, and treat a missing duration as one
+    // slot rather than letting it spill down the whole column.
+    const slotCount = Math.min(
+      Math.max(Number(slots) || 1, 1),
+      timeSlots.length - startIndex
+    );
 
-      const currentSlot = timeSlots[i];
+    const lastIndex = startIndex + slotCount - 1;
+    const crossesLunch = startIndex <= LUNCH_SLOT_INDEX && lastIndex > LUNCH_SLOT_INDEX;
 
-      if (currentSlot === '12:00') {
-        totalDuration += 1;  // Count the 12:00 slot
-        remainingSlots -= 1;
-
-        if (remainingSlots > 0) {
-          totalDuration += 1;  // Add one slot for the lunch break divider
-        }
-      } else {
-        totalDuration += 1;
-        remainingSlots -= 1;
-      }
-    }
-
-    return totalDuration;  // Total slots the appointment spans
+    return { slotCount, crossesLunch, span: slotCount + (crossesLunch ? 1 : 0) };
   };
 
-  const getAppointmentHeight = (duration) => {
-    const totalBorderHeight = (duration - 1) * 1.75; // Adjust for border heights
-    return `calc(${duration * 100}% + ${totalBorderHeight}px)`;
+  /**
+   * The exact height for a block. It starts 1px inside its first slot, so the
+   * two slot borders at either end come off the total - otherwise the block
+   * stops short of the last row's border and leaves a gap.
+   * @param {{slotCount: number, crossesLunch: boolean}} layout - From getAppointmentLayout
+   * @returns {string} A CSS height
+   */
+  const getAppointmentHeight = ({ slotCount, crossesLunch }) => {
+    const lunchRow = crossesLunch ? ` + ${LUNCH_HEIGHT}` : '';
+    return `calc(${slotCount} * ${ROW_HEIGHT}${lunchRow} - 2px)`;
   };
 
   const getAppointmentColor = (appointment) => {
@@ -105,22 +120,29 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
     return taskText;
   };
 
-  // New helper to build a "09:00 – 12:00" label
+  /**
+   * Build a "09:00 – 12:00" label for a block. The end is the time its last slot
+   * finishes, not the time the following slot starts, so a job up to lunch reads
+   * 12:30 rather than 13:30 and the last job of the day reads 18:00.
+   * @param {object} appointment - An appointment document
+   * @returns {string} e.g. '17:00 – 18:00'
+   */
   const getAppointmentTimeRange = (appointment) => {
     const start = appointment.startTime;
-    const slots = getAppointmentDurationSlots(appointment);
     const startIdx = timeSlots.indexOf(start);
-    const endIdx = Math.min(startIdx + slots, timeSlots.length - 1);
-    const end = timeSlots[endIdx];
-    return `${start} – ${end}`;
+    const { slotCount } = getAppointmentLayout(start, getAppointmentDurationSlots(appointment));
+
+    // slotCount is already capped at the end of the day, so this stays in range.
+    if (startIdx === -1 || slotCount === 0) return start;
+    return `${start} – ${slotEndTimes[startIdx + slotCount - 1]}`;
   };
 
-  // Unavailable blocks use the same span logic as appointments so they line up
+  // Unavailable blocks are measured the same way as appointments so they line up
   // with the grid, including the lunch break divider.
-  const getUnavailabilitySpan = (entry) => calculateAppointmentSpan({
-    startTime: getEntryWindow(entry).startTime,
-    details: { expectedTime: getEntrySlotCount(entry) },
-  });
+  const getUnavailabilityLayout = (entry) => getAppointmentLayout(
+    getEntryWindow(entry).startTime,
+    getEntrySlotCount(entry)
+  );
 
   return (
     <div
@@ -175,6 +197,9 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
                 const flagTooltip = flaggedReason
                   ? `Flagged account: ${flaggedReason}`
                   : 'Flagged account';
+                const appointmentLayout = appointment
+                  ? getAppointmentLayout(appointment.startTime, getAppointmentDurationSlots(appointment))
+                  : null;
                 const partsStatus = getPartsStatus(appointment?.details);
                 const partsBadge = PARTS_BADGES[partsStatus];
                 const PartsIcon = partsBadge?.icon;
@@ -197,10 +222,7 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
                         }}
                         style={{
                           backgroundColor: getAppointmentColor(appointment),
-                          height: getAppointmentHeight(
-                            calculateAppointmentSpan(appointment)
-                          ),
-                          gridRow: `span ${calculateAppointmentSpan(appointment)}`,
+                          height: getAppointmentHeight(appointmentLayout),
                         }}
                         title={blockTooltip}
                       >
@@ -229,10 +251,7 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
                           )}
                         </div>
                         <div>
-                          {getAppointmentTaskText(
-                            appointment,
-                            calculateAppointmentSpan(appointment)
-                          )}
+                          {getAppointmentTaskText(appointment, appointmentLayout.span)}
                         </div>
                       </div>
                     )}
@@ -244,8 +263,7 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
                           onTimeSlotClick(time, tech.id);
                         }}
                         style={{
-                          height: getAppointmentHeight(getUnavailabilitySpan(startingEntry)),
-                          gridRow: `span ${getUnavailabilitySpan(startingEntry)}`,
+                          height: getAppointmentHeight(getUnavailabilityLayout(startingEntry)),
                         }}
                         title={`${startingEntry.reason || 'Unavailable'} · ${describeEntryWindow(startingEntry)}`}
                       >
