@@ -7,6 +7,7 @@ import PrintableJobCard from '../PrintableJobCard/PrintableJobCard';
 import ReactToPrint from 'react-to-print';
 import { getTechnicians } from '../../utils/technicianUtils';
 import { getLocationSuffix } from '../../utils/location';
+import { describeNonWorkingDay, isNonWorkingDay, parseDateInputValue } from '../../utils/workingDays';
 import {
   PARTS_STATUS,
   PARTS_STATUS_OPTIONS,
@@ -598,8 +599,23 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       return;
     }
 
+    // Parse as a local date; new Date('2026-10-26') is UTC and can shift a day.
+    const parsedDate = parseDateInputValue(newDate);
+    if (!parsedDate) {
+      alert('Please select a valid date.');
+      return;
+    }
+
+    if (isNonWorkingDay(parsedDate)) {
+      alert(
+        `${parsedDate.toLocaleDateString('en-IE')} is ${describeNonWorkingDay(parsedDate)}. `
+        + 'Please choose a working day.'
+      );
+      return;
+    }
+
     // Format the date to match the original format
-    const formattedDate = new Date(newDate).toDateString(); // Converts to "Wed Sep 25 2024"
+    const formattedDate = parsedDate.toDateString(); // Converts to "Wed Sep 25 2024"
 
     // Create the updated appointment with the new date
     const updatedAppointment = {
@@ -680,6 +696,11 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   useEffect(() => {
     handleModalOpen();
   }, []);
+
+  const rescheduleParsedDate = parseDateInputValue(newDate);
+  const rescheduleDateWarning = rescheduleParsedDate && isNonWorkingDay(rescheduleParsedDate)
+    ? `${rescheduleParsedDate.toLocaleDateString('en-IE')} is ${describeNonWorkingDay(rescheduleParsedDate)}.`
+    : '';
 
   const hasCustomerNotes = customerNotes.trim() !== '';
   const hasPrivateNote = (formData.privateNote || '').trim() !== '';
@@ -1036,6 +1057,9 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
                   onChange={(e) => setNewDate(e.target.value)}
                 />
               </label>
+              {rescheduleDateWarning && (
+                <p className="reschedule-date-warning">{rescheduleDateWarning}</p>
+              )}
               <label>
                 Time:
                 <select
@@ -1047,7 +1071,9 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
                   ))}
                 </select>
               </label>
-              <button onClick={handleRescheduleSubmit}>Reschedule</button>
+              <button onClick={handleRescheduleSubmit} disabled={Boolean(rescheduleDateWarning)}>
+                Reschedule
+              </button>
               <button onClick={() => setIsRescheduleModalOpen(false)}>Cancel</button>
             </div>
           </div>

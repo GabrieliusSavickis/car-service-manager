@@ -10,6 +10,7 @@ import './AppointmentsPage.css';
 import { getTechnicians, clearTechniciansCache } from '../utils/technicianUtils';
 import { describeEntryWindow, entryCoversTime } from '../utils/unavailability';
 import { getLocationSuffix } from '../utils/location';
+import { describeNonWorkingDay, getNextWorkingDay, isNonWorkingDay } from '../utils/workingDays';
 
 function AppointmentsPage() {
   const locationSuffix = getLocationSuffix();
@@ -119,57 +120,6 @@ function AppointmentsPage() {
   }, [fetchAccountFlagMeta]);
   
 
-  const staticBankHolidays = [
-    '01/01', '17/03', '25/12', '26/12', // Fixed date holidays
-  ];
-
-  // Calculate Easter date using the Computus algorithm
-  const getEasterDate = (year) => {
-    const a = year % 19;
-    const b = Math.floor(year / 100);
-    const c = year % 100;
-    const d = Math.floor(b / 4);
-    const e = b % 4;
-    const f = Math.floor((b + 8) / 25);
-    const g = Math.floor((b - f + 1) / 3);
-    const h = (19 * a + b - d - g + 15) % 30;
-    const i = Math.floor(c / 4);
-    const k = c % 4;
-    const l = (32 + 2 * e + 2 * i - h - k) % 7;
-    const m = Math.floor((a + 11 * h + 22 * l) / 451);
-    const month = Math.floor((h + l - 7 * m + 114) / 31);
-    const day = ((h + l - 7 * m + 114) % 31) + 1;
-    return new Date(year, month - 1, day);
-  };
-
-  const getDynamicBankHolidays = (year) => {
-    const getFirstMonday = (month) => {
-      const firstDay = new Date(year, month, 1);
-      const dayOfWeek = firstDay.getDay();
-      return new Date(year, month, 1 + (8 - dayOfWeek) % 7);
-    };
-
-    const getLastMonday = (month) => {
-      const lastDay = new Date(year, month + 1, 0);
-      const dayOfWeek = lastDay.getDay();
-      return new Date(year, month, lastDay.getDate() - (dayOfWeek + 6) % 7);
-    };
-
-    // Easter Monday is the day after Easter
-    const easter = getEasterDate(year);
-    const easterMonday = new Date(easter);
-    easterMonday.setDate(easter.getDate() + 1);
-
-    return [
-      getFirstMonday(1).toLocaleDateString('en-IE'), // February (First Monday)
-      getFirstMonday(4).toLocaleDateString('en-IE'), // May (First Monday)
-      getFirstMonday(5).toLocaleDateString('en-IE'), // June (First Monday)
-      getFirstMonday(7).toLocaleDateString('en-IE'), // August (First Monday)
-      getLastMonday(9).toLocaleDateString('en-IE'),  // October (Last Monday)
-      easterMonday.toLocaleDateString('en-IE')       // Easter Monday
-    ];
-  };
-
   const timeSlots = [
     '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
     '12:00', '13:30', '14:00', '14:30', '15:00', '15:30',
@@ -274,18 +224,6 @@ function AppointmentsPage() {
     }
   };
 
-  const isNonWorkingDay = (date) => {
-    const day = date.getDay(); // 0 = Sunday, 6 = Saturday
-    // Format as DD/MM for consistent comparison
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const dateOfMonth = String(date.getDate()).padStart(2, '0');
-    const formattedDate = `${dateOfMonth}/${month}`;
-    const year = date.getFullYear();
-    const dynamicBankHolidays = getDynamicBankHolidays(year);
-
-    return day === 0 || day === 6 || staticBankHolidays.includes(formattedDate) || dynamicBankHolidays.includes(date.toLocaleDateString('en-IE'));
-  };
-
   const getMechanicUnavailabilityForSlot = (techId, time) => {
     return unavailability.find((entry) => entry.mechanic === techId && entryCoversTime(entry, time));
   };
@@ -301,7 +239,7 @@ function AppointmentsPage() {
     const selectedDay = new Date(selectedDate);
 
     if (isNonWorkingDay(selectedDay)) {
-      setWarningMessage('This date is a bank holiday or weekend. Appointments cannot be made.');
+      setWarningMessage(`This date is ${describeNonWorkingDay(selectedDay)}. Appointments cannot be made.`);
       return;
     }
 
@@ -718,28 +656,6 @@ function AppointmentsPage() {
     }
 
     return false;
-  };
-
-  const getNextWorkingDay = (currentDate) => {
-    let nextDay = new Date(currentDate);
-    nextDay.setDate(nextDay.getDate() + 1);
-
-    // Safeguard: Log to check the date progression
-    console.log("Initial nextDay:", nextDay);
-
-    while (isNonWorkingDay(nextDay)) {
-      nextDay.setDate(nextDay.getDate() + 1);
-
-      // Add a safeguard to prevent the infinite loop
-      if (nextDay.getDate() === currentDate.getDate()) {
-        console.error("Infinite loop detected in getNextWorkingDay. The date is not progressing.");
-        break;
-      }
-
-      console.log("Adjusted nextDay:", nextDay);
-    }
-
-    return nextDay;
   };
 
   const handleDeleteAppointment = async (id) => {

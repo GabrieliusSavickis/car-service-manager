@@ -569,3 +569,14 @@ form button:hover {
 .private-note-section--filled .private-note-toggle:hover {
   background-color: #9b59b6;
 }
+
+.reschedule-date-warning {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border: 1.5px solid #e53935;
+  border-radius: 6px;
+  background: #fdecea;
+  color: #b71c1c;
+  font-size: 13px;
+  font-weight: 600;
+}
