@@ -4,13 +4,13 @@ import './Calendar.css';
 import { FaEdit, FaFlag, FaBox, FaBoxOpen, FaTruck } from 'react-icons/fa';
 import { PARTS_STATUS, getPartsStatus, getPartsStatusLabel } from '../../utils/partsStatus';
 import {
-  UNAVAILABILITY_SLOT_END_TIMES,
-  UNAVAILABILITY_TIME_SLOTS,
   describeEntryWindow,
   entryCoversTime,
   getEntrySlotCount,
   getEntryWindow,
 } from '../../utils/unavailability';
+import { getTimetable } from '../../utils/timetable';
+import { getLocationKey } from '../../utils/location';
 
 // Parts state is shown as a badge so the block's background colour keeps meaning
 // job progress rather than doubling up as a parts indicator.
@@ -20,18 +20,6 @@ const PARTS_BADGES = {
   [PARTS_STATUS.RECEIVED]: { icon: FaBox, className: 'appointment-parts-badge--received' },
 };
 
-// The bookable slots, excluding lunch. Shared with the unavailability picker so
-// the grid and the hours a mechanic can be booked out for stay in step.
-const timeSlots = UNAVAILABILITY_TIME_SLOTS;
-
-// What each slot above finishes at. A slot is half an hour, so these are not
-// simply the next slot's start: the 12:00 block ends at 12:30 and lunch follows,
-// and the 17:30 block is the last of the day but runs until 18:00.
-const slotEndTimes = UNAVAILABILITY_SLOT_END_TIMES;
-
-// The last slot before the lunch divider is drawn.
-const LUNCH_SLOT_INDEX = timeSlots.indexOf('12:00');
-
 // Every slot row is exactly --calendar-row-height tall and the lunch divider
 // exactly --calendar-lunch-height, both set in Calendar.css. Heights are worked
 // out from those rather than from a percentage of one slot, so a block always
@@ -39,7 +27,19 @@ const LUNCH_SLOT_INDEX = timeSlots.indexOf('12:00');
 const ROW_HEIGHT = 'var(--calendar-row-height)';
 const LUNCH_HEIGHT = 'var(--calendar-lunch-height)';
 
-const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician, unavailabilityByTechId = {} }) => {
+const Calendar = ({
+  appointments,
+  onTimeSlotClick,
+  technicians,
+  onEditTechnician,
+  unavailabilityByTechId = {},
+  // Which slots exist, and where lunch falls, for the day being shown. Lunch
+  // differs between the garages and changed on a date, so this comes from the
+  // page rather than being fixed here. Defaulted so the grid still draws if a
+  // caller forgets to pass it.
+  timetable = getTimetable(getLocationKey(), new Date()),
+}) => {
+  const { slots: timeSlots, slotEndTimes, lunchAfterIndex } = timetable;
 
   const getFlagReasonText = (reasonValue) => {
     if (!reasonValue) return '';
@@ -71,7 +71,7 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
     );
 
     const lastIndex = startIndex + slotCount - 1;
-    const crossesLunch = startIndex <= LUNCH_SLOT_INDEX && lastIndex > LUNCH_SLOT_INDEX;
+    const crossesLunch = startIndex <= lunchAfterIndex && lastIndex > lunchAfterIndex;
 
     return { slotCount, crossesLunch, span: slotCount + (crossesLunch ? 1 : 0) };
   };
@@ -140,8 +140,8 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
   // Unavailable blocks are measured the same way as appointments so they line up
   // with the grid, including the lunch break divider.
   const getUnavailabilityLayout = (entry) => getAppointmentLayout(
-    getEntryWindow(entry).startTime,
-    getEntrySlotCount(entry)
+    getEntryWindow(entry, timetable).startTime,
+    getEntrySlotCount(entry, timetable)
   );
 
   return (
@@ -168,9 +168,9 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
       </div>
 
       <div className="calendar-body">
-        {timeSlots.map((time) => (
+        {timeSlots.map((time, slotIndex) => (
           <React.Fragment key={time}>
-            {time === '13:30' && (
+            {slotIndex === lunchAfterIndex + 1 && (
               <div
                 className="lunch-break-divider"
                 style={{ gridColumn: `1 / span ${technicians.length + 1}` }}
@@ -187,9 +187,11 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
                 const techUnavailability = unavailabilityByTechId[tech.id] || [];
                 // A slot is blocked by any entry covering it; the block itself is
                 // only drawn in the slot where that entry starts.
-                const coveringEntry = techUnavailability.find((entry) => entryCoversTime(entry, time));
+                const coveringEntry = techUnavailability.find(
+                  (entry) => entryCoversTime(entry, time, timetable)
+                );
                 const startingEntry = techUnavailability.find(
-                  (entry) => getEntryWindow(entry).startTime === time
+                  (entry) => getEntryWindow(entry, timetable).startTime === time
                 );
                 const isUnavailable = Boolean(coveringEntry);
                 const isFlagged = appointment?.accountFlagged === true;
@@ -265,10 +267,10 @@ const Calendar = ({ appointments, onTimeSlotClick, technicians, onEditTechnician
                         style={{
                           height: getAppointmentHeight(getUnavailabilityLayout(startingEntry)),
                         }}
-                        title={`${startingEntry.reason || 'Unavailable'} · ${describeEntryWindow(startingEntry)}`}
+                        title={`${startingEntry.reason || 'Unavailable'} · ${describeEntryWindow(startingEntry, timetable)}`}
                       >
                         <div className="appointment-time">
-                          <strong>{describeEntryWindow(startingEntry)}</strong>
+                          <strong>{describeEntryWindow(startingEntry, timetable)}</strong>
                         </div>
                         <div>{startingEntry.reason || 'Unavailable'}</div>
                       </div>

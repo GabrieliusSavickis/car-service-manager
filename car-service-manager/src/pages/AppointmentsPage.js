@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Header from '../components/Header/Header';
 import Calendar from '../components/Calendar/Calendar';
 import AppointmentModal from '../components/AppointmentModal/AppointmentModal';
@@ -9,11 +9,13 @@ import DatePicker from '../components/DatePicker/DatePicker';
 import './AppointmentsPage.css';
 import { getTechnicians, clearTechniciansCache } from '../utils/technicianUtils';
 import { describeEntryWindow, entryCoversTime } from '../utils/unavailability';
-import { getLocationSuffix } from '../utils/location';
+import { getLocationKey, getLocationSuffix } from '../utils/location';
+import { DAY_END, getTimetable } from '../utils/timetable';
 import { describeNonWorkingDay, getNextWorkingDay, isNonWorkingDay } from '../utils/workingDays';
 
 function AppointmentsPage() {
   const locationSuffix = getLocationSuffix();
+  const locationKey = getLocationKey();
 
   // Define the collection names
   const appointmentsCollectionName = 'appointments' + locationSuffix;
@@ -120,14 +122,26 @@ function AppointmentsPage() {
   }, [fetchAccountFlagMeta]);
   
 
-  const timeSlots = [
-    '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-    '12:00', '13:30', '14:00', '14:30', '15:00', '15:30',
-    '16:00', '16:30', '17:00', '17:30', '18:00',
-  ];
+  // Which slots are bookable on a given day. Lunch differs between the two
+  // garages and changed on a date, so this is looked up per day rather than
+  // fixed. The end of the working day stays appended to the list, because every
+  // index calculation below counts slots against it.
+  const slotsForDate = useCallback((date) => {
+    const day = date instanceof Date ? date : new Date(date);
+    // An unreadable date falls back to the day on screen rather than to the
+    // oldest lunch hour, which would be the wrong one for Ennis.
+    const usable = Number.isNaN(day.getTime()) ? selectedDate : day;
+    return [...getTimetable(locationKey, usable).slots, DAY_END];
+  }, [locationKey, selectedDate]);
 
-  const endOfWorkDay = '18:00'; // End of working hours
-  const workdayStart = '09:00'; // Start of working hours
+  // The day on screen, for the calendar and the pickers.
+  const timetable = useMemo(
+    () => getTimetable(locationKey, selectedDate),
+    [locationKey, selectedDate]
+  );
+
+  const endOfWorkDay = DAY_END; // End of working hours
+  const workdayStart = timetable.slots[0]; // Start of working hours
 
   useEffect(() => {
     const role = sessionStorage.getItem('userRole');
@@ -225,7 +239,9 @@ function AppointmentsPage() {
   };
 
   const getMechanicUnavailabilityForSlot = (techId, time) => {
-    return unavailability.find((entry) => entry.mechanic === techId && entryCoversTime(entry, time));
+    return unavailability.find(
+      (entry) => entry.mechanic === techId && entryCoversTime(entry, time, timetable)
+    );
   };
 
   const unavailabilityByTechId = unavailability.reduce((acc, entry) => {
@@ -247,7 +263,7 @@ function AppointmentsPage() {
     if (mechanicUnavailability) {
       const mechanicName = technicians.find((t) => t.id === techId)?.name || 'This mechanic';
       const reason = mechanicUnavailability.reason || 'Unavailable';
-      const window = describeEntryWindow(mechanicUnavailability);
+      const window = describeEntryWindow(mechanicUnavailability, timetable);
       setWarningMessage(`${mechanicName} is marked unavailable (${reason} - ${window}) on this date.`);
       return;
     }
@@ -297,8 +313,9 @@ function AppointmentsPage() {
     }
 
     // Determine if the appointment spans multiple days
-    const workdayEndIndex = timeSlots.indexOf(endOfWorkDay);
-    const startTimeIndex = timeSlots.indexOf(appointmentToSave.startTime);
+    const saveDaySlots = slotsForDate(appointmentToSave.date);
+    const workdayEndIndex = saveDaySlots.indexOf(endOfWorkDay);
+    const startTimeIndex = saveDaySlots.indexOf(appointmentToSave.startTime);
     const totalSlotsNeeded = appointmentToSave.details.expectedTime;
 
     const availableSlotsToday = workdayEndIndex - startTimeIndex;
@@ -410,15 +427,17 @@ function AppointmentsPage() {
           [...groupedDocs].sort((a, b) => {
             const ad = new Date(a.date), bd = new Date(b.date);
             if (!isNaN(ad) && !isNaN(bd) && ad - bd !== 0) return ad - bd;
-            return timeSlots.indexOf(a.startTime) - timeSlots.indexOf(b.startTime);
+            const daySlots = slotsForDate(a.date);
+            return daySlots.indexOf(a.startTime) - daySlots.indexOf(b.startTime);
           })[0];
         if (!anchorDoc) return;
         const anchorId = anchorDoc.id;
         const anchorDate = anchorDoc.date;
         const anchorStartTime = anchorDoc.startTime;
-        const anchorStartIndex = timeSlots.indexOf(anchorStartTime);
+        const anchorDaySlots = slotsForDate(anchorDate);
+        const anchorStartIndex = anchorDaySlots.indexOf(anchorStartTime);
         const totalExpectedSlots = appointmentToSave.details.expectedTime;
-        const slotsAvailableOnAnchorDay = workdayEndIndex - anchorStartIndex;
+        const slotsAvailableOnAnchorDay = anchorDaySlots.indexOf(endOfWorkDay) - anchorStartIndex;
         const anchorSegmentSlots = Math.min(totalExpectedSlots, slotsAvailableOnAnchorDay);
         const remainingSlots = Math.max(totalExpectedSlots - anchorSegmentSlots, 0);
 
@@ -522,8 +541,8 @@ function AppointmentsPage() {
     const technicianFromId = techId ? technicians.find(t => t.id === techId)?.name : undefined;
     const technicianName = technicianFromId || tech || undefined;
     
-    const startIndex = timeSlots.indexOf(startTime);
     const appointmentDate = new Date(date);
+    const startIndex = slotsForDate(appointmentDate).indexOf(startTime);
     const totalSlotsNeeded = details.segmentExpectedTime ?? details.expectedTime;
 
     let remainingSlots = totalSlotsNeeded;
@@ -551,14 +570,16 @@ function AppointmentsPage() {
 
         return matchById || matchByName;
       });
+      const daySlots = slotsForDate(currentDate);
+
       if (isSameDay) {
         // Calculate the available slots on the current day
-        const availableSlotsToday = timeSlots.length - startIndex;
+        const availableSlotsToday = daySlots.length - startIndex;
         const endIndex = startIndex + Math.min(availableSlotsToday, remainingSlots);
 
         // Check for overlap on the same day
         for (let app of appointmentsOnCurrentDay) {
-          const existingStartIndex = timeSlots.indexOf(app.startTime);
+          const existingStartIndex = daySlots.indexOf(app.startTime);
           const existingDuration = app.details.segmentExpectedTime ?? app.details.expectedTime;
           const existingEndIndex = existingStartIndex + existingDuration;
 
@@ -572,12 +593,12 @@ function AppointmentsPage() {
       } else {
         // Check for overlap on subsequent days
         for (let app of appointmentsOnCurrentDay) {
-          const existingStartIndex = timeSlots.indexOf(app.startTime);
+          const existingStartIndex = daySlots.indexOf(app.startTime);
           const existingDuration = app.details.segmentExpectedTime ?? app.details.expectedTime;
           const existingEndIndex = existingStartIndex + existingDuration;
 
           const spanStartIndex = 0;
-          const spanEndIndex = Math.min(remainingSlots, timeSlots.length);
+          const spanEndIndex = Math.min(remainingSlots, daySlots.length);
 
           if (spanStartIndex < existingEndIndex && spanEndIndex > existingStartIndex) {
             return true; // Overlap detected on the next day
@@ -585,7 +606,7 @@ function AppointmentsPage() {
         }
 
         // No overlap detected on the next day, return the number of slots used on this day
-        return Math.min(remainingSlots, timeSlots.length);
+        return Math.min(remainingSlots, daySlots.length);
       }
     };
 
@@ -633,8 +654,9 @@ function AppointmentsPage() {
       appointmentsOnNextDay.push({ ...doc.data(), id: doc.id });
     });
 
+    const nextDaySlots = slotsForDate(nextDay);
     const spanStartIndex = 0;
-    const spanEndIndex = Math.min(remainingSlots, timeSlots.length);
+    const spanEndIndex = Math.min(remainingSlots, nextDaySlots.length);
 
     for (let app of appointmentsOnNextDay) {
       // Skip siblings of the same group — they are this appointment's own segments
@@ -645,7 +667,7 @@ function AppointmentsPage() {
       const matchByName = technicianName ? (app.tech === technicianName) : false;
 
       if (matchById || matchByName) {
-        const existingStartIndex = timeSlots.indexOf(app.startTime);
+        const existingStartIndex = nextDaySlots.indexOf(app.startTime);
         const existingDuration = app.details.segmentExpectedTime ?? app.details.expectedTime;
         const existingEndIndex = existingStartIndex + existingDuration;
 
@@ -698,8 +720,9 @@ function AppointmentsPage() {
   };
 
   const getEndTime = (startTime) => {
-    const index = timeSlots.indexOf(startTime);
-    return timeSlots[index + 2] || timeSlots[timeSlots.length - 1];
+    const daySlots = slotsForDate(selectedDate);
+    const index = daySlots.indexOf(startTime);
+    return daySlots[index + 2] || daySlots[daySlots.length - 1];
   };
 
   const handleDateChange = (date) => {
@@ -795,6 +818,7 @@ function AppointmentsPage() {
         technicians={technicians}
         onEditTechnician={handleEditTechnician}
         unavailabilityByTechId={unavailabilityByTechId}
+        timetable={timetable}
       />
       {isModalOpen && (
         <AppointmentModal

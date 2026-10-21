@@ -6,7 +6,8 @@ import { collection, query, where, getDocs, setDoc, doc, getDoc, limit } from 'f
 import PrintableJobCard from '../PrintableJobCard/PrintableJobCard';
 import ReactToPrint from 'react-to-print';
 import { getTechnicians } from '../../utils/technicianUtils';
-import { getLocationSuffix } from '../../utils/location';
+import { getLocationKey, getLocationSuffix } from '../../utils/location';
+import { getTimetable } from '../../utils/timetable';
 import { describeNonWorkingDay, isNonWorkingDay, parseDateInputValue } from '../../utils/workingDays';
 import {
   PARTS_STATUS,
@@ -78,24 +79,23 @@ const getFlagReasonText = (flaggedReason) => {
   return FLAG_REASON_LABELS[flaggedReason] || flaggedReason;
 };
 
-const RESCHEDULE_WORKDAY_START_HOUR = 9;
-const RESCHEDULE_WORKDAY_END_HOUR = 18;
-const RESCHEDULE_TIME_OPTIONS = Array.from({ length: (RESCHEDULE_WORKDAY_END_HOUR - RESCHEDULE_WORKDAY_START_HOUR) * 2 + 1 }, (_, index) => {
-  const totalMinutes = RESCHEDULE_WORKDAY_START_HOUR * 60 + index * 30;
-  const hours = String(Math.floor(totalMinutes / 60)).padStart(2, '0');
-  const minutes = String(totalMinutes % 60).padStart(2, '0');
-  return `${hours}:${minutes}`;
-});
+/**
+ * The times an appointment can be moved to on a given day: the bookable slots
+ * themselves, nothing else. Offering every half hour let a job be moved onto
+ * lunch or onto 18:00, which are not slots - the calendar then could not place
+ * it, because it looks the start time up in the day's slot list.
+ * @param {Date|null} date - The day being moved to
+ * @returns {Array<string>} Bookable start times
+ */
+const getRescheduleTimeOptions = (date) => (
+  getTimetable(getLocationKey(), date instanceof Date ? date : new Date()).slots
+);
 
-const isValidRescheduleTime = (time) => RESCHEDULE_TIME_OPTIONS.includes(time);
+const isValidRescheduleTime = (time, options) => options.includes(time);
 
-const getSafeRescheduleTime = (time) => {
-  if (isValidRescheduleTime(time)) {
-    return time;
-  }
-
-  return RESCHEDULE_TIME_OPTIONS[0];
-};
+const getSafeRescheduleTime = (time, options) => (
+  isValidRescheduleTime(time, options) ? time : options[0]
+);
 
 function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, startTime }) {
 
@@ -584,18 +584,16 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
 
     setNewTechnicianId(initialRescheduleTechId);
     setNewDate(formattedDate);
-    setNewTime(getSafeRescheduleTime(appointment.startTime));
+    setNewTime(getSafeRescheduleTime(
+      appointment.startTime,
+      getRescheduleTimeOptions(isValidDate ? appointmentDate : new Date())
+    ));
     setIsRescheduleModalOpen(true);
   };
 
   const handleRescheduleSubmit = () => {
-    if (!newTechnicianId || !newDate || !newTime) {
+    if (!newTechnicianId || !newDate || !rescheduleTime) {
       alert('Please select a technician, date, and time to reschedule.');
-      return;
-    }
-
-    if (!isValidRescheduleTime(newTime)) {
-      alert('Please select a valid time between 09:00 and 18:00 in 30-minute intervals.');
       return;
     }
 
@@ -603,6 +601,13 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
     const parsedDate = parseDateInputValue(newDate);
     if (!parsedDate) {
       alert('Please select a valid date.');
+      return;
+    }
+
+    // Checked against the chosen day's own slots, because lunch - and so which
+    // slots exist - differs between the garages and changed on a date.
+    if (!isValidRescheduleTime(rescheduleTime, getRescheduleTimeOptions(parsedDate))) {
+      alert('Please pick one of the bookable times for that day.');
       return;
     }
 
@@ -622,7 +627,7 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
       ...appointment,
       techId: newTechnicianId, // Use technician ID instead of name
       date: formattedDate, // Use the formatted date
-      startTime: newTime,
+      startTime: rescheduleTime,
     };
 
     // Save the updated appointment
@@ -701,6 +706,12 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
   const rescheduleDateWarning = rescheduleParsedDate && isNonWorkingDay(rescheduleParsedDate)
     ? `${rescheduleParsedDate.toLocaleDateString('en-IE')} is ${describeNonWorkingDay(rescheduleParsedDate)}.`
     : '';
+
+  // Only the slots that exist on the chosen day, so a job cannot be moved onto
+  // lunch. Picking a day whose lunch differs re-points the list, and a time that
+  // day does not have falls back to its first slot.
+  const rescheduleTimeOptions = getRescheduleTimeOptions(rescheduleParsedDate);
+  const rescheduleTime = getSafeRescheduleTime(newTime, rescheduleTimeOptions);
 
   const hasCustomerNotes = customerNotes.trim() !== '';
   const hasPrivateNote = (formData.privateNote || '').trim() !== '';
@@ -1063,10 +1074,10 @@ function AppointmentModal({ appointment, onSave, onDelete, onClose, onCheckIn, s
               <label>
                 Time:
                 <select
-                  value={newTime}
+                  value={rescheduleTime}
                   onChange={(e) => setNewTime(e.target.value)}
                 >
-                  {RESCHEDULE_TIME_OPTIONS.map((timeOption) => (
+                  {rescheduleTimeOptions.map((timeOption) => (
                     <option key={timeOption} value={timeOption}>{timeOption}</option>
                   ))}
                 </select>

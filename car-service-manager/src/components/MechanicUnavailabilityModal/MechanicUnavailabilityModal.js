@@ -4,16 +4,15 @@ import {
   UNAVAILABILITY_COVERAGE,
   UNAVAILABILITY_COVERAGE_OPTIONS,
   UNAVAILABILITY_REASONS,
-  UNAVAILABILITY_SLOT_END_TIMES,
-  UNAVAILABILITY_TIME_SLOTS,
   describeEntryWindow,
   getEntryWindow,
   isCustomRangeValid,
 } from '../../utils/unavailability';
+import { getTimetable } from '../../utils/timetable';
+import { getLocationKey } from '../../utils/location';
+import { parseDateInputValue } from '../../utils/workingDays';
 
 const DEFAULT_REASON = UNAVAILABILITY_REASONS[0];
-const DEFAULT_CUSTOM_START = UNAVAILABILITY_TIME_SLOTS[0];
-const DEFAULT_CUSTOM_END = UNAVAILABILITY_SLOT_END_TIMES[UNAVAILABILITY_SLOT_END_TIMES.length - 1];
 
 const formatDateInputValue = (date) => {
   const year = date.getFullYear();
@@ -31,14 +30,32 @@ const toDate = (value) => {
 
 function MechanicUnavailabilityModal({ technicians, selectedDate, unavailabilityEntries = [], onSave, onDelete, onClose }) {
   const initialDateValue = useMemo(() => formatDateInputValue(selectedDate || new Date()), [selectedDate]);
+  const locationKey = getLocationKey();
   const [mechanic, setMechanic] = useState('');
   const [startDay, setStartDay] = useState(initialDateValue);
   const [endDay, setEndDay] = useState(initialDateValue);
   const [reason, setReason] = useState(DEFAULT_REASON);
   const [coverage, setCoverage] = useState(UNAVAILABILITY_COVERAGE.FULL);
-  const [startTime, setStartTime] = useState(DEFAULT_CUSTOM_START);
-  const [endTime, setEndTime] = useState(DEFAULT_CUSTOM_END);
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
   const [editingId, setEditingId] = useState(null);
+
+  // The hours on offer come from the first day being blocked out, because the
+  // two garages take lunch at different times and Ennis changed its hour.
+  const timetable = useMemo(
+    () => getTimetable(locationKey, parseDateInputValue(startDay) || new Date()),
+    [locationKey, startDay]
+  );
+
+  // Fall back to the whole day whenever the chosen hour is not a slot on that
+  // day, so changing the date can never leave a time selected that it does not
+  // have. The dropdowns show the fallback, so it is never a silent change.
+  const currentStartTime = timetable.slots.includes(startTime)
+    ? startTime
+    : timetable.slots[0];
+  const currentEndTime = timetable.slotEndTimes.includes(endTime)
+    ? endTime
+    : timetable.slotEndTimes[timetable.slotEndTimes.length - 1];
 
   useEffect(() => {
     if (technicians.length > 0 && !mechanic) {
@@ -71,8 +88,9 @@ function MechanicUnavailabilityModal({ technicians, selectedDate, unavailability
     setEditingId(null);
     setReason(DEFAULT_REASON);
     setCoverage(UNAVAILABILITY_COVERAGE.FULL);
-    setStartTime(DEFAULT_CUSTOM_START);
-    setEndTime(DEFAULT_CUSTOM_END);
+    // Cleared, so the hours fall back to the whole of whichever day is picked.
+    setStartTime('');
+    setEndTime('');
     setStartDay(initialDateValue);
     setEndDay(initialDateValue);
     if (technicians.length > 0) {
@@ -89,7 +107,8 @@ function MechanicUnavailabilityModal({ technicians, selectedDate, unavailability
     setEndDay(end ? formatDateInputValue(end) : initialDateValue);
     setReason(entry.reason || DEFAULT_REASON);
 
-    const window = getEntryWindow(entry);
+    const entryTimetable = getTimetable(locationKey, start || new Date());
+    const window = getEntryWindow(entry, entryTimetable);
     setCoverage(window.coverage);
     setStartTime(window.startTime);
     setEndTime(window.endTime);
@@ -117,7 +136,7 @@ function MechanicUnavailabilityModal({ technicians, selectedDate, unavailability
 
     const isCustom = coverage === UNAVAILABILITY_COVERAGE.CUSTOM;
 
-    if (isCustom && !isCustomRangeValid(startTime, endTime)) {
+    if (isCustom && !isCustomRangeValid(currentStartTime, currentEndTime, timetable)) {
       alert('End time cannot be before start time.');
       return;
     }
@@ -129,8 +148,8 @@ function MechanicUnavailabilityModal({ technicians, selectedDate, unavailability
       endDay: end,
       reason,
       coverage,
-      startTime: isCustom ? startTime : '',
-      endTime: isCustom ? endTime : '',
+      startTime: isCustom ? currentStartTime : '',
+      endTime: isCustom ? currentEndTime : '',
     });
   };
 
@@ -175,8 +194,8 @@ function MechanicUnavailabilityModal({ technicians, selectedDate, unavailability
             <div className="unavailability-time-range">
               <label>
                 From
-                <select value={startTime} onChange={(e) => setStartTime(e.target.value)} required>
-                  {UNAVAILABILITY_TIME_SLOTS.map((slot) => (
+                <select value={currentStartTime} onChange={(e) => setStartTime(e.target.value)} required>
+                  {timetable.slots.map((slot) => (
                     <option key={slot} value={slot}>{slot}</option>
                   ))}
                 </select>
@@ -184,8 +203,8 @@ function MechanicUnavailabilityModal({ technicians, selectedDate, unavailability
 
               <label>
                 To
-                <select value={endTime} onChange={(e) => setEndTime(e.target.value)} required>
-                  {UNAVAILABILITY_SLOT_END_TIMES.map((slot) => (
+                <select value={currentEndTime} onChange={(e) => setEndTime(e.target.value)} required>
+                  {timetable.slotEndTimes.map((slot) => (
                     <option key={slot} value={slot}>{slot}</option>
                   ))}
                 </select>
@@ -229,7 +248,10 @@ function MechanicUnavailabilityModal({ technicians, selectedDate, unavailability
               <div key={entry.id} className="unavailability-item">
                 <div>
                   <strong>{mechanicNameById[entry.mechanic] || entry.mechanic}</strong>
-                  <div>{entry.reason || 'Unavailable'} &middot; {describeEntryWindow(entry)}</div>
+                  <div>
+                    {entry.reason || 'Unavailable'} &middot;{' '}
+                    {describeEntryWindow(entry, getTimetable(locationKey, toDate(entry.startDay) || new Date()))}
+                  </div>
                   <div>
                     {start ? formatDateInputValue(start) : 'Unknown'} to {end ? formatDateInputValue(end) : 'Unknown'}
                   </div>
