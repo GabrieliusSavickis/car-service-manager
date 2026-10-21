@@ -1,0 +1,60 @@
+rules_version = '2';
+
+// Access rules for the ASG appointment manager.
+//
+// Before this file existed the database was open: every collection could be
+// read by anyone on the internet, because the Firebase config needed to reach
+// it is public in the deployed JavaScript. That meant customer names, phone
+// numbers, registrations and the whole diary were readable without logging in.
+//
+// Deployed with:  firebase deploy --only firestore:rules
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // The staff directory.
+    //
+    // This has to stay readable without signing in. The login form accepts a
+    // username instead of an email address, and it looks up the matching email
+    // before it can authenticate - so that one read happens while nobody is
+    // signed in yet. Requiring a login here would stop every member of staff
+    // who types a username rather than an email from getting in at all.
+    //
+    // What it exposes is a username, an email address and a role. It holds no
+    // password: those live in Firebase Authentication, which never hands them
+    // out. See the note at the bottom about closing this off properly.
+    match /users/{userId} {
+      allow read: if true;
+    }
+
+    // Everything else: the diary, customer accounts, mechanics, unavailability,
+    // stock, and the analytics figures - for signed-in staff only.
+    //
+    // Deliberately a single catch-all rather than a rule per collection. The
+    // collections are named by site ('appointments' and 'appointments_ennis'
+    // and so on), and a list that missed one would deny it, which on a Monday
+    // morning means staff opening the app to an error instead of the diary.
+    // This way nothing can be left out, including any collection added later.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+
+// Known limitations, in the order worth fixing them:
+//
+// 1. Signed-in staff can write to /users, so a technician could in principle
+//    raise their own role to admin. No part of the app offers to do that, and
+//    there are only a handful of staff accounts, but it is not enforced here.
+//    Fixing it means naming each collection in place of the catch-all above.
+//
+// 2. /users is world-readable, which exposes staff usernames and emails. To
+//    close it, store the username-to-email mapping in its own collection keyed
+//    by username, let the login form fetch that single document by id, and then
+//    require a login on /users itself.
+//
+// 3. A signed-in Kerry user can reach Ennis data and the other way round, and
+//    roles are not enforced here at all - admin-only actions like deleting an
+//    appointment are checked in the browser only. Enforcing either properly
+//    needs the user's role and site in the auth token as custom claims, since
+//    documents in /users are keyed by an auto-id rather than by auth uid.
